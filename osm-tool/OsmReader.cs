@@ -48,7 +48,7 @@ public class OsmReader
                 double lon = double.Parse(reader.GetAttribute("lon")!);
                 bool visible = bool.Parse(reader.GetAttribute("visible") ?? "true");
                 int version = int.Parse(reader.GetAttribute("version")!);
-                long changeSet = long.Parse(reader.GetAttribute("changeset")!);
+                long changeSet = long.Parse(reader.GetAttribute("changeset") ?? "0");
                 DateTimeOffset timestamp = DateTimeOffset.Parse(reader.GetAttribute("timestamp")!);
                 string user = reader.GetAttribute("user") ?? "N/A";
                 long uid = long.Parse(reader.GetAttribute("uid") ?? "0");
@@ -101,7 +101,7 @@ public class OsmReader
                 long id = long.Parse(reader.GetAttribute("id")!);
                 bool visible = bool.Parse(reader.GetAttribute("visible") ?? "true");
                 int version = int.Parse(reader.GetAttribute("version")!);
-                long changeSet = long.Parse(reader.GetAttribute("changeset")!);
+                long changeSet = long.Parse(reader.GetAttribute("changeset") ?? "0");
                 DateTimeOffset timestamp = DateTimeOffset.Parse(reader.GetAttribute("timestamp")!);
                 string user = reader.GetAttribute("user") ?? "N/A";
                 long uid = long.Parse(reader.GetAttribute("uid") ?? "0");

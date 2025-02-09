@@ -9,10 +9,6 @@ public class Program
         var reader = new OsmReader();
 
         var c = reader.IterateNodes("map.osm").Count();
-        if (c != 19718)
-        {
-            throw new Exception(c.ToString());
-        }
         Console.WriteLine($"Node count: {c}");
         Console.WriteLine("Saving nodes...");
         reader.SaveNodes("map.osm");

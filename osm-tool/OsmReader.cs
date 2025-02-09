@@ -43,7 +43,6 @@ public class OsmReader
             if (reader.NodeType == XmlNodeType.Element && reader.Name == "node")
             {
                 long id = long.Parse(reader.GetAttribute("id")!);
-                Console.WriteLine(id);
                 double lat = double.Parse(reader.GetAttribute("lat")!);
                 double lon = double.Parse(reader.GetAttribute("lon")!);
                 bool visible = bool.Parse(reader.GetAttribute("visible") ?? "true");

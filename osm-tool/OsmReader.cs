@@ -46,12 +46,12 @@ public class OsmReader
                 Console.WriteLine(id);
                 double lat = double.Parse(reader.GetAttribute("lat")!);
                 double lon = double.Parse(reader.GetAttribute("lon")!);
-                bool visible = bool.Parse(reader.GetAttribute("visible")!);
+                bool visible = bool.Parse(reader.GetAttribute("visible") ?? "true");
                 int version = int.Parse(reader.GetAttribute("version")!);
                 long changeSet = long.Parse(reader.GetAttribute("changeset")!);
                 DateTimeOffset timestamp = DateTimeOffset.Parse(reader.GetAttribute("timestamp")!);
-                string user = reader.GetAttribute("user")!;
-                long uid = long.Parse(reader.GetAttribute("uid")!);
+                string user = reader.GetAttribute("user") ?? "N/A";
+                long uid = long.Parse(reader.GetAttribute("uid") ?? "0");
                 var tagDict = new Dictionary<string, string>();
 
                 var depth = reader.Depth;
@@ -99,12 +99,12 @@ public class OsmReader
             if (reader.NodeType == XmlNodeType.Element && reader.Name == "way")
             {
                 long id = long.Parse(reader.GetAttribute("id")!);
-                bool visible = bool.Parse(reader.GetAttribute("visible")!);
+                bool visible = bool.Parse(reader.GetAttribute("visible") ?? "true");
                 int version = int.Parse(reader.GetAttribute("version")!);
                 long changeSet = long.Parse(reader.GetAttribute("changeset")!);
                 DateTimeOffset timestamp = DateTimeOffset.Parse(reader.GetAttribute("timestamp")!);
-                string user = reader.GetAttribute("user")!;
-                long uid = long.Parse(reader.GetAttribute("uid")!);
+                string user = reader.GetAttribute("user") ?? "N/A";
+                long uid = long.Parse(reader.GetAttribute("uid") ?? "0");
                 var tagDict = new Dictionary<string, string>();
                 var nodeReferences = new List<long>();
 

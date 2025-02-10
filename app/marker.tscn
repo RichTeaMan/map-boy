@@ -1,0 +1,7 @@
+[gd_scene load_steps=2 format=3 uid="uid://ca587oe3rcyf5"]
+
+[ext_resource type="PackedScene" uid="uid://nu8e1jsg1gru" path="res://assets/highlight.glb" id="1_6ckro"]
+
+[node name="Marker" type="Node3D"]
+
+[node name="highlight" parent="." instance=ExtResource("1_6ckro")]

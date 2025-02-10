@@ -1,0 +1,26 @@
+[gd_scene load_steps=4 format=3 uid="uid://dnot2k6d5atay"]
+
+[ext_resource type="Script" path="res://main.gd" id="1_4rdyb"]
+[ext_resource type="PackedScene" uid="uid://ca587oe3rcyf5" path="res://marker.tscn" id="2_8qnr4"]
+
+[sub_resource type="Environment" id="Environment_7ihdo"]
+background_mode = 2
+background_energy_multiplier = 7.91
+ambient_light_color = Color(0.907942, 0.907942, 0.907942, 1)
+ambient_light_energy = 7.65
+
+[node name="Main" type="Node3D"]
+script = ExtResource("1_4rdyb")
+
+[node name="HTTPRequest" type="HTTPRequest" parent="."]
+
+[node name="map" type="Node3D" parent="."]
+
+[node name="Camera3D" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, -4.37114e-08, 1, 0, -1, -4.37114e-08, 0, 5, 0)
+current = true
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_7ihdo")
+
+[node name="Marker" parent="." instance=ExtResource("2_8qnr4")]

@@ -1,0 +1,28 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "osm-tool", "osm-tool\osm-tool.csproj", "{20192F4C-35E2-4D7A-881E-B6F54B4DF44D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "osm-api", "osm-api\osm-api.csproj", "{4B05C6BF-AEA4-41CB-AC4F-C21FDA6FC066}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{20192F4C-35E2-4D7A-881E-B6F54B4DF44D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{20192F4C-35E2-4D7A-881E-B6F54B4DF44D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{20192F4C-35E2-4D7A-881E-B6F54B4DF44D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{20192F4C-35E2-4D7A-881E-B6F54B4DF44D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4B05C6BF-AEA4-41CB-AC4F-C21FDA6FC066}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4B05C6BF-AEA4-41CB-AC4F-C21FDA6FC066}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4B05C6BF-AEA4-41CB-AC4F-C21FDA6FC066}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4B05C6BF-AEA4-41CB-AC4F-C21FDA6FC066}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

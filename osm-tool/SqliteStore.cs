@@ -1,22 +1,39 @@
+using System.Data;
 using Microsoft.Data.Sqlite;
 using OsmTool.Models;
 
 namespace OsmTool;
 
+public record Coord
+{
+    public double Lat { get; set; }
+    public double Lon { get; set; }
+}
+
+public class Way
+{
+    public long Id { get; set; }
+    public bool? Visible { get; set; }
+    public int? Version { get; set; }
+    public long? ChangeSet { get; set; }
+    public DateTimeOffset? Timestamp { get; set; }
+    public string? User { get; set; }
+    public long? Uid { get; set; }
+    public List<Coord> Coordinates { get; set; }
+    public string? Name { get; set; }
+}
 
 public class SqliteStore
 {
-    private IReader reader;
-
-    public SqliteStore(IReader reader)
+    private SqliteConnection createConnection()
     {
-        this.reader = reader;
+        return new SqliteConnection("Data Source=/home/tom/projects/map-boy/osm-tool/osm.db");
     }
 
-    public void SaveNodes()
+    public void SaveNodes(IReader reader)
     {
 
-        using var connection = new SqliteConnection("Data Source=osm.db");
+        using var connection = createConnection();
         connection.Open();
 
 
@@ -82,7 +99,7 @@ public class SqliteStore
     private Dictionary<long, OsmNode> FetchByIds(long[] ids)
     {
         var result = new Dictionary<long, OsmNode>();
-        using var connection = new SqliteConnection("Data Source=osm.db");
+        using var connection = createConnection();
         connection.Open();
 
         using var command = connection.CreateCommand();
@@ -109,10 +126,9 @@ public class SqliteStore
         return result;
     }
 
-    public void SaveWays()
+    public void SaveWays(IReader reader)
     {
-
-        using var connection = new SqliteConnection("Data Source=osm.db");
+        using var connection = createConnection();
         connection.Open();
 
         using var createTableCommand = connection.CreateCommand();
@@ -155,10 +171,16 @@ public class SqliteStore
         var nodeIds = wayBatch.SelectMany(w => w.NodeReferences).Distinct().ToArray();
         var nodes = FetchByIds(nodeIds);
         using var transaction = connection.BeginTransaction();
+        int noCoord = 0;
+        int wayTotal = 0;
         foreach (var way in wayBatch)
         {
             var coords = string.Join(";", way.NodeReferences.Select(id => $"{nodes[id].Lat},{nodes[id].Lon}"));
-
+            if (way.NodeReferences.Count == 0)
+            {
+                noCoord++;
+            }
+            wayTotal++;
             using var insertWayCommand = connection.CreateCommand();
             insertWayCommand.CommandText = @"
                     INSERT INTO way (id, visible, version, change_set, timestamp, user, uid, coords, name)
@@ -176,5 +198,37 @@ public class SqliteStore
             insertWayCommand.ExecuteNonQuery();
         }
         transaction.Commit();
+        Console.WriteLine($"{noCoord}/{wayTotal}");
     }
+
+    public IEnumerable<Way> FetchWays()
+    {
+        using var connection = createConnection();
+        connection.Open();
+
+        using var command = connection.CreateCommand();
+        command.CommandText = @"SELECT id, visible, version, change_set, timestamp, user, uid, coords, name FROM way;";
+
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            yield return new Way
+            {
+                Id = reader.GetInt64(0),
+                Visible = reader.GetBoolean(1),
+                Version = reader.GetInt32(2),
+                ChangeSet = reader.GetInt64(3),
+                Timestamp = DateTimeOffset.Parse(reader.GetString(4)),
+                User = reader.GetString(5),
+                Uid = reader.GetInt64(6),
+                Coordinates = reader.GetString(7).Split(';').Select(s =>
+                {
+                    var coords = s.Split(',');
+                    return new Coord { Lat = double.Parse(coords[0]), Lon = double.Parse(coords[1]) };
+                }).ToList(),
+                Name = reader.NullableString(8)
+            };
+        }
+    }
+
 }

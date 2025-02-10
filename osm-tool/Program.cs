@@ -14,12 +14,12 @@ public class Program
         var c = reader.IterateNodes().Count();
         Console.WriteLine($"Node count: {c}");
 
-        var store = new SqliteStore(reader);
+        var store = new SqliteStore();
         
         Console.WriteLine("Saving nodes...");
-        store.SaveNodes();
+        store.SaveNodes(reader);
         Console.WriteLine("Saving ways...");
-        store.SaveWays();
+        store.SaveWays(reader);
         Console.WriteLine("Complete");
     }
 }

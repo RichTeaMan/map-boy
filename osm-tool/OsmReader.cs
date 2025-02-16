@@ -96,7 +96,6 @@ public class OsmReader : IReader
 
                 while (reader.NodeType != XmlNodeType.EndElement)// && reader.Depth != depth)
                 {
-                    Console.WriteLine("tag");
                     if (reader.NodeType == XmlNodeType.Element && reader.Name == "tag")
                     {
                         string? key = reader.GetAttribute("k");
@@ -108,7 +107,6 @@ public class OsmReader : IReader
                     }
                     if (reader.NodeType == XmlNodeType.Element && reader.Name == "nd")
                     {
-                        Console.WriteLine("ref");
                         string? nodeRef = reader.GetAttribute("ref");
                         if (nodeRef != null)
                         {

@@ -24,9 +24,15 @@ public class OsmNode : OsmBase
     public double Lat { get; set; }
     public double Lon { get; set; }
 
+    public bool LocationEquals(OsmNode other){
+        return Lat == other.Lat && Lon == other.Lon;
+    }
+
 }
 
 public class OsmWay : OsmBase
 {
     public required ReadOnlyCollection<long> NodeReferences { get; init; }
+
+    public bool ClosedLoop { get; init; }
 }

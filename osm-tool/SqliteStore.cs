@@ -21,6 +21,8 @@ public class Way
     public long? Uid { get; set; }
     public List<Coord> Coordinates { get; set; }
     public string? Name { get; set; }
+
+    public bool ClosedLoop { get; set; }
 }
 
 public class SqliteStore
@@ -142,7 +144,8 @@ public class SqliteStore
             user TEXT NOT NULL,
             uid INTEGER NULL,
             coords TEXT NOT NULL,
-            name TEXT NULL
+            name TEXT NULL,
+            closed_loop INTEGER NOT NULL
         );
         ";
 
@@ -180,11 +183,12 @@ public class SqliteStore
             {
                 noCoord++;
             }
+            bool closedLoop = nodes[way.NodeReferences.First()].LocationEquals(nodes[way.NodeReferences.Last()]);
             wayTotal++;
             using var insertWayCommand = connection.CreateCommand();
             insertWayCommand.CommandText = @"
-                    INSERT INTO way (id, visible, version, change_set, timestamp, user, uid, coords, name)
-                        VALUES($id, $visible, $version, $change_set, $timestamp, $user, $uid, $coords, $name);
+                    INSERT INTO way (id, visible, version, change_set, timestamp, user, uid, coords, name, closed_loop)
+                        VALUES($id, $visible, $version, $change_set, $timestamp, $user, $uid, $coords, $name, $closed_loop);
                     ";
             insertWayCommand.Parameters.AddWithValue("$id", way.Id);
             insertWayCommand.Parameters.AddWithValue("$visible", way.Visible as object ?? DBNull.Value);
@@ -195,10 +199,10 @@ public class SqliteStore
             insertWayCommand.Parameters.AddWithValue("$uid", way.Uid as object ?? DBNull.Value);
             insertWayCommand.Parameters.AddWithValue("$coords", coords);
             insertWayCommand.Parameters.AddWithValue("$name", way.Tags.ContainsKey("name") ? way.Tags["name"] : DBNull.Value);
+            insertWayCommand.Parameters.AddWithValue("$closed_loop", closedLoop);
             insertWayCommand.ExecuteNonQuery();
         }
         transaction.Commit();
-        Console.WriteLine($"{noCoord}/{wayTotal}");
     }
 
     public IEnumerable<Way> FetchWays()
@@ -207,7 +211,7 @@ public class SqliteStore
         connection.Open();
 
         using var command = connection.CreateCommand();
-        command.CommandText = @"SELECT id, visible, version, change_set, timestamp, user, uid, coords, name FROM way;";
+        command.CommandText = @"SELECT id, visible, version, change_set, timestamp, user, uid, coords, name, closed_loop FROM way;";
 
         using var reader = command.ExecuteReader();
         while (reader.Read())
@@ -226,7 +230,8 @@ public class SqliteStore
                     var coords = s.Split(',');
                     return new Coord { Lat = double.Parse(coords[0]), Lon = double.Parse(coords[1]) };
                 }).ToList(),
-                Name = reader.NullableString(8)
+                Name = reader.NullableString(8),
+                ClosedLoop = reader.GetBoolean(9),
             };
         }
     }

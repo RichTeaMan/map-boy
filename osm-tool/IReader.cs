@@ -8,4 +8,6 @@ public interface IReader
     IEnumerable<OsmNode> IterateNodes();
 
     IEnumerable<OsmWay> IterateWays();
+
+    IEnumerable<OsmRelation> IterateRelations();
 }

@@ -36,3 +36,15 @@ public class OsmWay : OsmBase
 
     public bool ClosedLoop { get; init; }
 }
+
+public class OsmRelationMember
+{
+    public long Id { get; init; }
+    public string Role { get; init; }
+    public string Type { get; init; }
+}
+
+public class OsmRelation : OsmBase
+{
+    public required ReadOnlyCollection<OsmRelationMember> Members { get; init; }
+}

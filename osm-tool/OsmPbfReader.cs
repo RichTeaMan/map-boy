@@ -55,4 +55,32 @@ public class OsmPbfReader : IReader
         }
     }
 
+    public IEnumerable<OsmRelation> IterateRelations()
+    {
+        using var fileStream = File.OpenRead(Uri);
+        using var source = new PBFOsmStreamSource(fileStream);
+
+        foreach (var osmGeo in source.Where(o => o.Type == OsmSharp.OsmGeoType.Relation))
+        {
+            var osmRelation = (OsmSharp.Relation)osmGeo;
+            yield return new OsmRelation
+            {
+                Id = osmGeo.Id!.Value,
+                Visible = osmGeo.Visible,
+                Version = osmGeo.Version,
+                ChangeSet = osmGeo.ChangeSetId,
+                Timestamp = osmGeo.TimeStamp,
+                User = osmGeo.UserName,
+                Uid = osmGeo.UserId,
+                Members = osmRelation.Members.Select(m => new OsmRelationMember
+                {
+                    Id = m.Id,
+                    Role = m.Role,
+                    Type = m.Type.ToString()
+                }).ToList().AsReadOnly(),
+                Tags = osmRelation.Tags.ToDictionary(t => t.Key, t => t.Value)
+            };
+        }
+    }
+
 }

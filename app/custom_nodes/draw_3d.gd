@@ -31,8 +31,8 @@ const MATERIAL_POINT_SIZE: int = 8
 var _default_material: StandardMaterial3D
 var _default_points_material: StandardMaterial3D
 
-
-func _ready() -> void:
+func _init():
+#func _ready() -> void:
     mesh = ImmediateMesh.new()
     _setup_materials()
 
@@ -51,7 +51,6 @@ func _setup_materials() -> void:
     _default_material = StandardMaterial3D.new()
     _default_material.vertex_color_use_as_albedo = true
     _default_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-    _default_material.albedo_color = Color.AQUA
     
     _default_points_material = _default_material.duplicate()
     # enabling use_point_size replaces all lines with vertex points
@@ -138,7 +137,7 @@ func _draw_primitive(
         material = _default_material
 
     var last_surface_idx = mesh.get_surface_count() - 1
-    mesh.surface_set_material(last_surface_idx, _default_material)
+    mesh.surface_set_material(last_surface_idx, material)
 
 func _draw_triangles(
         primitive_type: int,
@@ -173,92 +172,6 @@ func _draw_triangles(
     var last_surface_idx = mesh.get_surface_count() - 1
     mesh.surface_set_material(last_surface_idx, _default_material)
 
-static func create_mesh_from_polygon(polygon_points):
-    var indices = Geometry2D.triangulate_polygon(polygon_points)
-
-    if indices.is_empty():
-        print("Error: Triangulation failed.")
-        return null
-
-    var arrays = []
-    arrays.resize(Mesh.ARRAY_MAX)
-
-    var vertices = PackedVector3Array()
-    for point in polygon_points:
-        vertices.append(Vector3(point.x, 0, point.y))  # Assuming XY plane
-
-    arrays[Mesh.ARRAY_VERTEX] = vertices
-    arrays[Mesh.ARRAY_INDEX] = indices
-
-    var mesh = ArrayMesh.new()
-    mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-
-    return mesh
-
-static func triangulate_polygon_godot4(polygon_points):
-    # polygon_points should be an Array of Vector2s (NOT Vector3s)
-    if polygon_points.size() < 3:
-        print("Error: Polygon must have at least 3 points.")
-        return null
-
-    var polygon_points_2d = PackedVector2Array()
-    for point in polygon_points:
-        if point is Vector3:
-            polygon_points_2d.append(Vector2(point.x, point.y))
-        else:
-            polygon_points_2d.append(point)
-
-    var indices = Geometry2D.triangulate_polygon(polygon_points_2d)
-
-    if indices.is_empty():
-        print("Error: Triangulation failed.")
-        return null
-
-    var mdt = MeshDataTool.new()
-
-    # Add vertices (Vector3, assuming XY plane):
-    for point in polygon_points_2d:
-        mdt.add_vertex(Vector3(point.x, point.y, 0))
-
-    # Add triangles (using the indices):
-    for i in range(0, indices.size(), 3):
-        mdt.add_polygon(PackedInt32Array([indices[i], indices[i + 1], indices[i + 2]]))
-
-
-    var mesh = ArrayMesh.new()
-    mdt.commit(mesh)
-
-    return mesh
-
-static func triangulate_polygon(vertices: Array[Vector2]):
-    #var indices := Geometry2D.triangulate_polygon(vertices)
-    #var indices := Geometry3D. .tetrahedralize_delaunay(PackedVector3Array(vertices))# .triangulate_polygon(vertices)
-    #if indices.size() == 0:
-    #    print("NO INDICIES!")
-     #   return
-    #for ind in indices:
-        
-    #_draw_primitive(Mesh.PRIMITIVE_TRIANGLE_STRIP, indices)
-    #return indices
-    
-    var mesh = create_mesh_from_polygon(vertices)
-    if mesh == null: #Handle the triangulation error
-        return
-
-    var meshInstance = MeshInstance3D.new()
-    meshInstance.mesh = mesh # $MeshInstance is a reference to your MeshInstance3D node.
-
-    # ... assign a material to the mesh (important!) ...
-    #var material = StandardMaterial3D.new()
-    #material.albedo_color = Color.AQUA
-    
-    var _default_material = StandardMaterial3D.new()
-    _default_material.vertex_color_use_as_albedo = true
-    _default_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-    _default_material.albedo_color = Color.AQUA
-    mesh.surface_set_material(0, _default_material)
-    return meshInstance
-
 ################################################################################
 # draw_primitive shortcuts
 
@@ -267,8 +180,8 @@ static func triangulate_polygon(vertices: Array[Vector2]):
 ## [br][br]Vertices are supplied as an Array of Vector3 coordinates or as [i]colored vertices[/i].
 ## See [method _draw_primitive] for details.
 ##
-func draw_points(vertices: Array, color: Color = default_color) -> void:
-    _draw_primitive(Mesh.PRIMITIVE_POINTS, vertices, color)
+func draw_points(vertices: Array, color: Color = default_color, custom_material: BaseMaterial3D = null) -> void:
+    _draw_primitive(Mesh.PRIMITIVE_POINTS, vertices, color, custom_material)
 
 
 ## Draw line segments between the given vertices.
@@ -276,11 +189,11 @@ func draw_points(vertices: Array, color: Color = default_color) -> void:
 ## [br][br]Vertices are supplied as an Array of Vector3 coordinates or as [i]colored vertices[/i].
 ## See [method _draw_primitive] for details.
 ##
-func draw_line(vertices: Array, color: Color = default_color) -> void:
-    _draw_primitive(Mesh.PRIMITIVE_LINE_STRIP, vertices, color)
+func draw_line(vertices: Array, color: Color = default_color, custom_material: BaseMaterial3D = null) -> void:
+    _draw_primitive(Mesh.PRIMITIVE_LINE_STRIP, vertices, color, custom_material)
 
     if draw_vertex_points:
-        draw_points(vertices, color)
+        draw_points(vertices, color, custom_material)
 
 
 ## Draw looping line segments between the given vertices.

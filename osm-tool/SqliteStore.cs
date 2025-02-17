@@ -38,6 +38,7 @@ public class Way
     public string? Name { get; set; }
     public bool ClosedLoop { get; set; }
     public string SuggestedColour { get; set; }
+    public long TileId { get; set; }
 }
 
 public class Area
@@ -52,13 +53,23 @@ public class Area
     public List<Coord> Coordinates { get; set; }
     public string? Name { get; set; }
     public string SuggestedColour { get; set; }
+    public long TileId { get; set; }
 }
 
 public class SqliteStore
 {
+    private readonly TileService tileService = new TileService();
+
+    private string FilePath {get;init;}
+
+    public SqliteStore(string filePath)
+    {
+        FilePath = filePath;
+    }
+
     private SqliteConnection createConnection()
     {
-        return new SqliteConnection("Data Source=/home/tom/projects/map-boy/osm-tool/osm.db");
+        return new SqliteConnection($"Data Source={FilePath}");
     }
 
     public void SaveNodes(IReader reader)
@@ -79,8 +90,10 @@ public class SqliteStore
             user TEXT NULL,
             uid INTEGER NULL,
             lat REAL NOT NULL,
-            lon REAL NOT NULL
+            lon REAL NOT NULL,
+            tile_id INTEGER NOT NULL
         );
+        CREATE INDEX idx_node_tile_id ON node (tile_id);
         ";
 
         createTableCommand.ExecuteNonQuery();
@@ -103,15 +116,15 @@ public class SqliteStore
         }
     }
 
-    private static void SaveNodeBatch(SqliteConnection connection, List<OsmNode> nodeBatch)
+    private void SaveNodeBatch(SqliteConnection connection, List<OsmNode> nodeBatch)
     {
         using var transaction = connection.BeginTransaction();
         foreach (var node in nodeBatch)
         {
             using var insertNodeCommand = connection.CreateCommand();
             insertNodeCommand.CommandText = @"
-                INSERT INTO node (id, visible, version, change_set, timestamp, user, uid, lat, lon)
-                    VALUES($id, $visible, $version, $change_set, $timestamp, $user, $uid, $lat, $lon);
+                INSERT INTO node (id, visible, version, change_set, timestamp, user, uid, lat, lon, tile_id)
+                    VALUES($id, $visible, $version, $change_set, $timestamp, $user, $uid, $lat, $lon, $tile_id);
                 ";
             insertNodeCommand.Parameters.AddWithValue("$id", node.Id);
             insertNodeCommand.Parameters.AddWithValue("$visible", node.Visible as object ?? DBNull.Value);
@@ -122,6 +135,7 @@ public class SqliteStore
             insertNodeCommand.Parameters.AddWithValue("$uid", node.Uid as object ?? DBNull.Value);
             insertNodeCommand.Parameters.AddWithValue("$lat", node.Lat);
             insertNodeCommand.Parameters.AddWithValue("$lon", node.Lon);
+            insertNodeCommand.Parameters.AddWithValue("$tile_id", tileService.CalcTileId(node.Lat, node.Lon));
             insertNodeCommand.ExecuteNonQuery();
         }
         transaction.Commit();
@@ -175,8 +189,10 @@ public class SqliteStore
             coords TEXT NOT NULL,
             name TEXT NULL,
             closed_loop INTEGER NOT NULL,
-            suggested_colour TEXT NOT NULL
+            suggested_colour TEXT NOT NULL,
+            tile_id INTEGER NOT NULL
         );
+        CREATE INDEX idx_way_tile_id ON way (tile_id);
         ";
 
         createTableCommand.ExecuteNonQuery();
@@ -328,7 +344,8 @@ public class SqliteStore
         int wayTotal = 0;
         foreach (var way in wayBatch)
         {
-            var coords = string.Join(";", way.NodeReferences.Select(id => $"{nodes[id].Lat},{nodes[id].Lon}"));
+            var wayNodes = way.NodeReferences.Select(id => nodes[id]).ToArray();
+            var coords = string.Join(";", wayNodes.Select(n => $"{n.Lat},{n.Lon}"));
             if (way.NodeReferences.Count == 0)
             {
                 noCoord++;
@@ -337,8 +354,8 @@ public class SqliteStore
             wayTotal++;
             using var insertWayCommand = connection.CreateCommand();
             insertWayCommand.CommandText = @"
-                    INSERT INTO way (id, visible, version, change_set, timestamp, user, uid, coords, name, closed_loop, suggested_colour)
-                        VALUES($id, $visible, $version, $change_set, $timestamp, $user, $uid, $coords, $name, $closed_loop, $suggested_colour);
+                    INSERT INTO way (id, visible, version, change_set, timestamp, user, uid, coords, name, closed_loop, suggested_colour, tile_id)
+                        VALUES($id, $visible, $version, $change_set, $timestamp, $user, $uid, $coords, $name, $closed_loop, $suggested_colour, $tile_id);
                     ";
             insertWayCommand.Parameters.AddWithValue("$id", way.Id);
             insertWayCommand.Parameters.AddWithValue("$visible", way.Visible as object ?? DBNull.Value);
@@ -351,23 +368,36 @@ public class SqliteStore
             insertWayCommand.Parameters.AddWithValue("$name", way.Tags.ContainsKey("name") ? way.Tags["name"] : DBNull.Value);
             insertWayCommand.Parameters.AddWithValue("$closed_loop", closedLoop);
             insertWayCommand.Parameters.AddWithValue("$suggested_colour", calcSuggestedColour(way));
+            insertWayCommand.Parameters.AddWithValue("$tile_id", tileService.CalcTileId(wayNodes.Average(n => n.Lat), wayNodes.Average(n => n.Lon)));
             insertWayCommand.ExecuteNonQuery();
         }
         transaction.Commit();
     }
 
-    public IEnumerable<Way> FetchWays(long[]? ids = null)
+    public IEnumerable<Way> FetchWays(long[]? ids = null, long[]? tileIds = null)
     {
         using var connection = createConnection();
         connection.Open();
 
         using var command = connection.CreateCommand();
         command.CommandText = @"SELECT id, visible, version, change_set, timestamp, user, uid, coords, name, closed_loop, suggested_colour FROM way";
+        var whereClauses = new List<string>();
         if (ids != null)
         {
             var q = string.Join(',', ids);
-            command.CommandText += $" WHERE id IN ({q})";
+            whereClauses.Add($"id IN ({q})");
         }
+        if (tileIds != null)
+        {
+            var q = string.Join(',', tileIds);
+            whereClauses.Add($"tile_id IN ({q})");
+        }
+
+        if (whereClauses.Count > 0)
+        {
+            command.CommandText += " WHERE " + string.Join(" AND ", whereClauses);
+        }
+        command.CommandText += ";";
 
         using var reader = command.ExecuteReader();
         while (reader.Read())
@@ -410,8 +440,10 @@ public class SqliteStore
             uid INTEGER NULL,
             coords TEXT NOT NULL,
             name TEXT NULL,
-            suggested_colour TEXT NOT NULL
+            suggested_colour TEXT NOT NULL,
+            tile_id INTEGER NOT NULL
         );
+        CREATE INDEX idx_area_tile_id ON area (tile_id);
         ";
 
         createTableCommand.ExecuteNonQuery();
@@ -441,7 +473,7 @@ public class SqliteStore
         int wayTotal = 0;
 
         var wayIds = relationBatch.SelectMany(r => r.Members).Where(m => m.Type == "way").Select(m => m.Id);
-        
+
         var waysDict = wayIds.Chunk(1000).SelectMany(chunk =>
         {
             var ways = FetchWays(chunk.ToArray());
@@ -540,8 +572,8 @@ public class SqliteStore
             wayTotal++;
             using var insertAreaCommand = connection.CreateCommand();
             insertAreaCommand.CommandText = @"
-                    INSERT INTO area (id, visible, version, change_set, timestamp, user, uid, coords, name, suggested_colour)
-                        VALUES($id, $visible, $version, $change_set, $timestamp, $user, $uid, $coords, $name, $suggested_colour);
+                    INSERT INTO area (id, visible, version, change_set, timestamp, user, uid, coords, name, suggested_colour, tile_id)
+                        VALUES($id, $visible, $version, $change_set, $timestamp, $user, $uid, $coords, $name, $suggested_colour, $tile_id);
                     ";
             insertAreaCommand.Parameters.AddWithValue("$id", relation.Id);
             insertAreaCommand.Parameters.AddWithValue("$visible", relation.Visible as object ?? DBNull.Value);
@@ -553,18 +585,38 @@ public class SqliteStore
             insertAreaCommand.Parameters.AddWithValue("$coords", coords);
             insertAreaCommand.Parameters.AddWithValue("$name", relation.Tags.ContainsKey("name") ? relation.Tags["name"] : DBNull.Value);
             insertAreaCommand.Parameters.AddWithValue("$suggested_colour", calcSuggestedColour(relation));
+            insertAreaCommand.Parameters.AddWithValue("$tile_id", tileService.CalcTileId(orderedCoords.Average(n => n.Lat), orderedCoords.Average(n => n.Lon)));
             insertAreaCommand.ExecuteNonQuery();
         }
         transaction.Commit();
     }
 
-    public IEnumerable<Area> FetchAreas()
+    public IEnumerable<Area> FetchAreas(long[]? ids = null, long[]? tileIds = null)
     {
         using var connection = createConnection();
         connection.Open();
 
         using var command = connection.CreateCommand();
-        command.CommandText = @"SELECT id, visible, version, change_set, timestamp, user, uid, coords, name, suggested_colour FROM area;";
+        command.CommandText = @"SELECT id, visible, version, change_set, timestamp, user, uid, coords, name, suggested_colour FROM area";
+
+        var whereClauses = new List<string>();
+
+        if (ids != null)
+        {
+            var q = string.Join(',', ids);
+            whereClauses.Add($"id IN ({q})");
+        }
+        if (tileIds != null)
+        {
+            var q = string.Join(',', tileIds);
+            whereClauses.Add($"tile_id IN ({q})");
+        }
+
+        if (whereClauses.Count > 0)
+        {
+            command.CommandText += " WHERE " + string.Join(" AND ", whereClauses);
+        }
+        command.CommandText += ";";
 
         using var reader = command.ExecuteReader();
         while (reader.Read())

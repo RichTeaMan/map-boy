@@ -12,12 +12,16 @@ ambient_light_energy = 7.65
 [node name="Main" type="Node3D"]
 script = ExtResource("1_4rdyb")
 
-[node name="HTTPRequest" type="HTTPRequest" parent="."]
+[node name="waysHttpRequest" type="HTTPRequest" parent="."]
+
+[node name="areasHttpRequest" type="HTTPRequest" parent="."]
+
+[node name="tilesIdRangeHttpRequest" type="HTTPRequest" parent="."]
 
 [node name="map" type="Node3D" parent="."]
 
 [node name="Camera3D" type="Camera3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, -4.37114e-08, 1, 0, -1, -4.37114e-08, 0, 5, 0)
+transform = Transform3D(-4.37114e-08, 1, 4.37114e-08, 0, -4.37114e-08, 1, 1, 4.37114e-08, 1.91069e-15, 0, 5, 0)
 current = true
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]

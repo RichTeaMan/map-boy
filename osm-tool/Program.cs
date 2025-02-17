@@ -38,7 +38,9 @@ public class Program
         var c = reader.IterateNodes().Count();
         Console.WriteLine($"Node count: {c}");
 
-        var store = new SqliteStore();
+        string dbPath = (datafile + ".db").Split("/").Last();
+        File.Delete(dbPath);
+        var store = new SqliteStore(dbPath);
 
         Console.WriteLine("Saving nodes...");
         store.SaveNodes(reader);

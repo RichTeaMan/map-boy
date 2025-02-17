@@ -1,5 +1,6 @@
 *.osm
 *.db
+*.osm.pbf
 
 *.swp
 *.*~

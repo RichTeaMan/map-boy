@@ -5,7 +5,6 @@ const layer_factor = 0.1
 
 var loaded_tiles = []
 
-var way_queue = []
 var area_queue = []
 var way_pending = false
 var area_pending = false
@@ -23,18 +22,11 @@ func _ready():
     
     #$Camera3D.look_at(Vector3(avg_lat, 0.0, avg_lon), Vector3(0,1,0))
     
-    $waysHttpRequest.request_completed.connect(_on_ways_http_request_request_completed)
     $areasHttpRequest.request_completed.connect(_on_areas_http_request_request_completed)
     $tilesIdRangeHttpRequest.request_completed.connect(_on_tiles_http_request_request_completed)
 
 func _process(_delta: float):
     
-    if !way_pending && way_queue.size() > 0:
-        way_pending = true
-        var tile_id = way_queue.pop_front()
-        print("Requesting ways for tile %s." % tile_id)
-        $waysHttpRequest.request("http://127.0.0.1:5291/ways?tileId=%s" % tile_id)
-        
     if !area_pending && area_queue.size() > 0:
         area_pending = true
         var tile_id = area_queue.pop_front()
@@ -60,7 +52,6 @@ func _process(_delta: float):
     
     refresh_tile_queue()
 
-
 func refresh_tile_queue():
     if tiles_pending:
         return
@@ -82,29 +73,6 @@ func refresh_tile_queue():
     
     last_pos_lat = current_lat
     last_pos_long = current_lon
-
-func _on_ways_http_request_request_completed(_result, _response_code, _headers, body):
-    print("ways response...")
-    var ways = JSON.parse_string(body.get_string_from_utf8())
-    if ways != null:
-        for way in ways:
-            if way.suggestedColour == "white" && way.layer >= 0:
-                print("Way is white: %s" % way.id)
-                continue
-            var vector_2d_list: Array[Vector2] = []
-            for c in way.coordinates:
-                var lat = c.lat * coord_factor
-                var lon = c.lon * coord_factor
-                
-                vector_2d_list.append(Vector2(lat, lon))
-            var way_node = WayRender.create_way_node(way, vector_2d_list)
-            if way_node != null:
-                $map.add_child(way_node)
-                if way.suggestedColour == "red" || way.suggestedColour == "dark-green" || way.suggestedColour == "grey" || way.suggestedColour == "light-grey":
-                    way_node.position.y += 0.05
-                way_node.position.y += layer_factor * way.layer
-    print("ways response processed")
-    way_pending = false
 
 func _on_areas_http_request_request_completed(_result, _response_code, _headers, body):
     print("area response...")
@@ -138,7 +106,6 @@ func _on_tiles_http_request_request_completed(_result, _response_code, _headers,
     for tileId in tileResponse.tileIds:
         if loaded_tiles.has(tileId):
             continue
-        way_queue.append(tileId)
         area_queue.append(tileId)
         loaded_tiles.append(tileId)
     #print("tile response processed")

@@ -23,6 +23,11 @@ public record Coord
     {
         return Lat == other.Lat && Lon == other.Lon;
     }
+
+    public static Coord[] FromNodes(IEnumerable<OsmNode> nodes)
+    {
+        return nodes.Select(n => new Coord { Lat = n.Lat, Lon = n.Lon }).ToArray();
+    }
 }
 
 public class Way
@@ -34,13 +39,14 @@ public class Way
     public DateTimeOffset? Timestamp { get; set; }
     public string? User { get; set; }
     public long? Uid { get; set; }
-    public List<Coord> Coordinates { get; set; }
-    public string? Name { get; set; }
     public bool ClosedLoop { get; set; }
-    public string SuggestedColour { get; set; }
-    public long TileId { get; set; }
-    public int Layer { get; set; }
     public long? AreaParentId { get; set; }
+    public string Tags { get; set; } = "";
+
+    public Dictionary<string, string> TagsToDict()
+    {
+        return Tags.Split(';').Select(t => t.Split('=')).Where(t => t.Length == 2).ToDictionary(t => t[0], t => t[1]);
+    }
 }
 
 public class Area
@@ -72,7 +78,16 @@ public class SqliteStore
 
     private SqliteConnection createConnection()
     {
-        return new SqliteConnection($"Data Source={FilePath}");
+        var connection = new SqliteConnection($"Data Source={FilePath}");
+        connection.Open();
+        // Enable write-ahead logging
+        var walCommand = connection.CreateCommand();
+        walCommand.CommandText =
+        @"
+            PRAGMA journal_mode = 'wal'
+        ";
+        walCommand.ExecuteNonQuery();
+        return connection;
     }
 
     public void SaveNodes(IReader reader)
@@ -152,7 +167,7 @@ public class SqliteStore
         connection.Open();
 
         using var command = connection.CreateCommand();
-        var q = string.Join(',', ids);
+        var q = string.Join(',', ids.Distinct());
         // I gave up making this parametered. nothing works
         command.CommandText = @"SELECT id, visible, version, change_set, timestamp, user, uid, lat, lon FROM node WHERE id IN ($ids);".Replace("$ids", q);
 
@@ -182,7 +197,7 @@ public class SqliteStore
 
         using var createTableCommand = connection.CreateCommand();
         createTableCommand.CommandText = @"
-            CREATE TABLE IF NOT EXISTS way (
+        CREATE TABLE IF NOT EXISTS way (
             id INTEGER PRIMARY KEY,
             visible INTEGER NULL,
             version INTEGER NULL,
@@ -190,15 +205,17 @@ public class SqliteStore
             timestamp TEXT NULL,
             user TEXT NOT NULL,
             uid INTEGER NULL,
-            coords TEXT NOT NULL,
-            name TEXT NULL,
             closed_loop INTEGER NOT NULL,
-            suggested_colour TEXT NOT NULL,
-            tile_id INTEGER NOT NULL,
-            layer INTEGER NOT NULL,
-            area_parent_id INTEGER NULL
+            area_parent_id INTEGER NULL,
+            tags TEXT NOT NULL
         );
-        CREATE INDEX idx_way_tile_id ON way (tile_id);
+
+        CREATE TABLE IF NOT EXISTS way_node_map (
+            way_id INTEGER NOT NULL,
+            node_id INTEGER NOT NULL,
+            ordinal INTEGER NOT NULL
+        );
+        CREATE INDEX idx_way_node_map_way_id ON way_node_map (way_id);
         ";
 
         createTableCommand.ExecuteNonQuery();
@@ -221,9 +238,9 @@ public class SqliteStore
         }
     }
 
-    private string calcSuggestedColour(OsmBase osmBase)
+    private string calcSuggestedColour(Dictionary<string, string> tags)
     {
-        if (osmBase.Tags.TryGetValue("highway", out string? highway))
+        if (tags.TryGetValue("highway", out string? highway))
         {
             switch (highway)
             {
@@ -260,7 +277,7 @@ public class SqliteStore
                     return "light-grey";
             }
         }
-        if (osmBase.Tags.TryGetValue("area:highway", out string? areaHighway))
+        if (tags.TryGetValue("area:highway", out string? areaHighway))
         {
             switch (areaHighway)
             {
@@ -297,9 +314,9 @@ public class SqliteStore
                     return "light-grey";
             }
         }
-        if (osmBase.Tags.ContainsKey("waterway"))
+        if (tags.TryGetValue("waterway", out string? waterway))
         {
-            switch (osmBase.Tags["waterway"])
+            switch (waterway)
             {
                 case "river":
                 case "riverbank":
@@ -324,19 +341,19 @@ public class SqliteStore
                     return "blue";
             }
         }
-        if (osmBase.Tags.ContainsKey("water"))
+        if (tags.ContainsKey("water"))
         {
             return "blue";
         }
-        if (osmBase.Tags.ContainsKey("building") || osmBase.Tags.ContainsKey("building:colour") || osmBase.Tags.ContainsKey("building:part"))
+        if (tags.ContainsKey("building") || tags.ContainsKey("building:colour") || tags.ContainsKey("building:part"))
         {
             return "grey";
         }
-        if (osmBase.Tags.ContainsKey("bridge:structure"))
+        if (tags.ContainsKey("bridge:structure"))
         {
             return "grey";
         }
-        if (osmBase.Tags.TryGetValue("landuse", out string? landUse))
+        if (tags.TryGetValue("landuse", out string? landUse))
         {
             switch (landUse)
             {
@@ -345,7 +362,7 @@ public class SqliteStore
                     return "green";
             }
         }
-        if (osmBase.Tags.TryGetValue("natural", out string? natural))
+        if (tags.TryGetValue("natural", out string? natural))
         {
             switch (natural)
             {
@@ -353,9 +370,9 @@ public class SqliteStore
                 case "wood": return "dark-green";
             }
         }
-        if (osmBase.Tags.ContainsKey("leisure"))
+        if (tags.TryGetValue("leisure", out string? leisure))
         {
-            switch (osmBase.Tags["leisure"])
+            switch (leisure)
             {
                 case "park":
                 case "playground":
@@ -396,7 +413,6 @@ public class SqliteStore
         foreach (var way in wayBatch)
         {
             var wayNodes = way.NodeReferences.Select(id => nodes[id]).ToArray();
-            var coords = string.Join(";", wayNodes.Select(n => $"{n.Lat},{n.Lon}"));
             if (way.NodeReferences.Count == 0)
             {
                 noCoord++;
@@ -406,11 +422,14 @@ public class SqliteStore
                 && !way.Tags.ContainsKey("highway")
                 && !way.Tags.ContainsKey("barrier")
                 && !way.Tags.ContainsKey("waterway");
+
+            string tags = string.Join(";", way.Tags.Select(t => $"{t.Key}={t.Value}"));
             wayTotal++;
+
             using var insertWayCommand = connection.CreateCommand();
             insertWayCommand.CommandText = @"
-                    INSERT INTO way (id, visible, version, change_set, timestamp, user, uid, coords, name, closed_loop, suggested_colour, tile_id, layer)
-                        VALUES($id, $visible, $version, $change_set, $timestamp, $user, $uid, $coords, $name, $closed_loop, $suggested_colour, $tile_id, $layer);
+                    INSERT INTO way (id, visible, version, change_set, timestamp, user, uid, closed_loop, tags)
+                        VALUES($id, $visible, $version, $change_set, $timestamp, $user, $uid, $closed_loop, $tags);
                     ";
             insertWayCommand.Parameters.AddWithValue("$id", way.Id);
             insertWayCommand.Parameters.AddWithValue("$visible", way.Visible as object ?? DBNull.Value);
@@ -419,13 +438,22 @@ public class SqliteStore
             insertWayCommand.Parameters.AddWithValue("$timestamp", way.Timestamp?.ToString("yyyy-MM-ddTHH:mm:ssZ") as object ?? DBNull.Value);
             insertWayCommand.Parameters.AddWithValue("$user", way.User as object ?? DBNull.Value);
             insertWayCommand.Parameters.AddWithValue("$uid", way.Uid as object ?? DBNull.Value);
-            insertWayCommand.Parameters.AddWithValue("$coords", coords);
-            insertWayCommand.Parameters.AddWithValue("$name", way.Tags.TryGetValue("name", out string? nameValue) ? nameValue : DBNull.Value);
             insertWayCommand.Parameters.AddWithValue("$closed_loop", closedLoop);
-            insertWayCommand.Parameters.AddWithValue("$suggested_colour", calcSuggestedColour(way));
-            insertWayCommand.Parameters.AddWithValue("$tile_id", tileService.CalcTileId(wayNodes.Average(n => n.Lat), wayNodes.Average(n => n.Lon)));
-            insertWayCommand.Parameters.AddWithValue("$layer", way.Tags.TryGetValue("layer", out string? layerValue) ? layerValue : 0);
+            insertWayCommand.Parameters.AddWithValue("$tags", tags);
             insertWayCommand.ExecuteNonQuery();
+
+            foreach (var node in wayNodes.Select((e, i) => new { e.Id, ordinal = i }))
+            {
+                using var insertWayNodeCommand = connection.CreateCommand();
+                insertWayNodeCommand.CommandText = @"
+                    INSERT INTO way_node_map (way_id, node_id, ordinal)
+                        VALUES($way_id, $node_id, $ordinal);
+                    ";
+                insertWayNodeCommand.Parameters.AddWithValue("$way_id", way.Id);
+                insertWayNodeCommand.Parameters.AddWithValue("$node_id", node.Id);
+                insertWayNodeCommand.Parameters.AddWithValue("$ordinal", node.ordinal);
+                insertWayNodeCommand.ExecuteNonQuery();
+            }
         }
         transaction.Commit();
     }
@@ -436,7 +464,7 @@ public class SqliteStore
         connection.Open();
 
         using var command = connection.CreateCommand();
-        command.CommandText = @"SELECT id, visible, version, change_set, timestamp, user, uid, coords, name, closed_loop, suggested_colour, tile_id, layer FROM way";
+        command.CommandText = @"SELECT id, visible, version, change_set, timestamp, user, uid, closed_loop, tags FROM way";
         var whereClauses = new List<string>();
         if (ids != null)
         {
@@ -467,27 +495,55 @@ public class SqliteStore
                 Timestamp = DateTimeOffset.Parse(reader.GetString("timestamp")),
                 User = reader.GetString("user"),
                 Uid = reader.GetInt64("uid"),
-                Coordinates = reader.GetString("coords").Split(';').Select(s =>
-                {
-                    var coords = s.Split(',');
-                    return new Coord { Lat = double.Parse(coords[0]), Lon = double.Parse(coords[1]) };
-                }).ToList(),
-                Name = reader.NullableString("name"),
                 ClosedLoop = reader.GetBoolean("closed_loop"),
-                SuggestedColour = reader.GetString("suggested_colour"),
-                TileId = reader.GetInt64("tile_id"),
-                Layer = reader.GetInt32("layer"),
+                Tags = reader.GetString("tags")
             };
         }
     }
 
-    public void SaveAreas(IReader reader)
+    private Dictionary<long, OsmNode[]> FetchNodesByWayIds(long[] wayIds)
     {
+        var result = wayIds.Distinct().ToDictionary(id => id, _id => Array.Empty<OsmNode>());
         using var connection = createConnection();
         connection.Open();
 
-        using var createTableCommand = connection.CreateCommand();
-        createTableCommand.CommandText = @"
+        using var command = connection.CreateCommand();
+        var q = string.Join(',', wayIds);
+        command.CommandText = @"SELECT way_id, node_id, ordinal FROM way_node_map WHERE way_id IN ($way_ids);".Replace("$way_ids", q);
+
+        var wayNodeMaps = wayIds.ToDictionary(id => id, _id => new List<Tuple<long, int>>());
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            var wayId = reader.GetInt64("way_id");
+            var nodeId = reader.GetInt64("node_id");
+            var ordinal = reader.GetInt32("ordinal");
+
+            wayNodeMaps[wayId].Add(new Tuple<long, int>(nodeId, ordinal));
+        }
+        var nodeIds = wayNodeMaps.SelectMany(kv => kv.Value.Select(e => e.Item1)).ToArray();
+        var nodes = FetchByIds(nodeIds);
+
+        foreach (var wayId in wayIds)
+        {
+
+            var wayNodeMap = wayNodeMaps[wayId];
+            var wayNodes = wayNodeMap.OrderBy(m => m.Item2).Select(m => nodes!.GetValueOrDefault(m.Item1, null)).ToArray();
+            result[wayId] = wayNodes!;
+        }
+        connection.Close();
+
+        return result;
+    }
+
+    public void SaveAreas(IReader reader)
+    {
+        using (var connection = createConnection())
+        {
+            connection.Open();
+
+            using var createTableCommand = connection.CreateCommand();
+            createTableCommand.CommandText = @"
             CREATE TABLE IF NOT EXISTS area (
             id INTEGER PRIMARY KEY,
             visible INTEGER NULL,
@@ -505,38 +561,69 @@ public class SqliteStore
         CREATE INDEX idx_area_tile_id ON area (tile_id);
         ";
 
-        createTableCommand.ExecuteNonQuery();
+            createTableCommand.ExecuteNonQuery();
 
-        var relationBatch = new List<OsmRelation>();
-        foreach (var relation in reader.IterateRelations())
-        {
-            if (relation.Tags.Any(t => t.Key == "type" && t.Value == "multipolygon"))
+            var relationBatch = new List<OsmRelation>();
+            foreach (var relation in reader.IterateRelations())
             {
-                relationBatch.Add(relation);
-                if (relationBatch.Count >= 100)
+                if (relation.Tags.Any(t => t.Key == "type" && t.Value == "multipolygon"))
                 {
-                    SaveAreaBatch(connection, relationBatch);
-                    relationBatch.Clear();
+                    relationBatch.Add(relation);
+                    if (relationBatch.Count >= 100)
+                    {
+                        SaveAreaBatch(connection, relationBatch);
+                        relationBatch.Clear();
+                    }
                 }
             }
+            if (relationBatch.Any())
+            {
+                SaveAreaBatch(connection, relationBatch);
+            }
         }
-        if (relationBatch.Any())
+
+        using (var connection = createConnection())
         {
-            SaveAreaBatch(connection, relationBatch);
+            connection.Open();
+            Console.WriteLine("Writing single polygon areas.");
+            var wayBatch = new List<Way>();
+            foreach (var way in FetchWays())
+            {
+                if (way.AreaParentId != null || !way.ClosedLoop)
+                {
+                    continue;
+                }
+                wayBatch.Add(way);
+                if (wayBatch.Count >= 100)
+                {
+                    SaveAreaBatch(connection, wayBatch);
+                    wayBatch.Clear();
+                }
+            }
+            if (wayBatch.Any())
+            {
+                SaveAreaBatch(connection, wayBatch);
+            }
         }
+
     }
 
     private void SaveAreaBatch(SqliteConnection connection, List<OsmRelation> relationBatch)
     {
-        using var transaction = connection.BeginTransaction();
-
-        var wayIds = relationBatch.SelectMany(r => r.Members).Where(m => m.Type == "way").Select(m => m.Id);
+        var wayIds = relationBatch.SelectMany(r => r.Members).Where(m => m.Type == "way").Select(m => m.Id).Distinct();
 
         var waysDict = wayIds.Chunk(1000).SelectMany(chunk =>
         {
             var ways = FetchWays(chunk.ToArray());
             return ways;
         }).ToDictionary(k => k.Id, v => v);
+        var wayNodes = wayIds.Chunk(1000).SelectMany(chunk =>
+        {
+            var wayNodes = FetchNodesByWayIds(chunk.ToArray());
+            return wayNodes;
+        }).ToDictionary();
+
+        using var transaction = connection.BeginTransaction();
 
         foreach (var relation in relationBatch)
         {
@@ -571,47 +658,51 @@ public class SqliteStore
             // some fiddly code to close it ourselves
             var unusedWays = new List<Way>(outerWays);
             var orderedCoords = new List<Coord>();
-            orderedCoords.AddRange(unusedWays.First().Coordinates);
+            orderedCoords.AddRange(Coord.FromNodes(wayNodes[unusedWays.First().Id]));
             unusedWays.Remove(unusedWays.First());
 
             while (unusedWays.Count > 0)
             {
                 // find next coord with shortest distance
                 double shortest = double.MaxValue;
-                Way? next = null;
+                Coord[]? nextCoordinates = null;
+                Way? nextWay = null;
                 bool reversed = false;
                 foreach (var way in unusedWays)
                 {
-                    var dist = way.Coordinates.First().DistanceSquaredTo(orderedCoords.Last());
+                    var wayCoords = Coord.FromNodes(wayNodes[way.Id]);
+                    var dist = wayCoords.First().DistanceSquaredTo(orderedCoords.Last());
                     if (dist < shortest)
                     {
                         shortest = dist;
-                        next = way;
+                        nextCoordinates = wayCoords;
+                        nextWay = way;
                         reversed = false;
                     }
 
-                    dist = way.Coordinates.Last().DistanceSquaredTo(orderedCoords.Last());
+                    dist = wayCoords.Last().DistanceSquaredTo(orderedCoords.Last());
                     if (dist < shortest)
                     {
                         shortest = dist;
-                        next = way;
+                        nextCoordinates = wayCoords;
+                        nextWay = way;
                         reversed = true;
                     }
                 }
 
-                if (next == null)
+                if (nextCoordinates == null || nextWay == null)
                 {
                     Console.WriteLine($"Failed to find next way for relation {relation.Id}");
                     break;
                 }
 
-                var nextRange = reversed ? next.Coordinates.Reverse<Coord>() : next.Coordinates;
+                var nextRange = reversed ? nextCoordinates.Reverse<Coord>() : nextCoordinates;
                 if (shortest == 0.0)
                 {
                     nextRange = nextRange.Skip(1);
                 }
                 orderedCoords.AddRange(nextRange);
-                unusedWays.Remove(next);
+                unusedWays.Remove(nextWay);
             }
 
             if (orderedCoords.Count == 0)
@@ -640,7 +731,7 @@ public class SqliteStore
             insertAreaCommand.Parameters.AddWithValue("$uid", relation.Uid as object ?? DBNull.Value);
             insertAreaCommand.Parameters.AddWithValue("$coords", coords);
             insertAreaCommand.Parameters.AddWithValue("$name", relation.Tags.TryGetValue("name", out string? nameValue) ? nameValue : DBNull.Value);
-            insertAreaCommand.Parameters.AddWithValue("$suggested_colour", calcSuggestedColour(relation));
+            insertAreaCommand.Parameters.AddWithValue("$suggested_colour", calcSuggestedColour(relation.Tags));
             insertAreaCommand.Parameters.AddWithValue("$tile_id", tileService.CalcTileId(orderedCoords.Average(n => n.Lat), orderedCoords.Average(n => n.Lon)));
             insertAreaCommand.Parameters.AddWithValue("$layer", relation.Tags.TryGetValue("layer", out string? layerValue) ? layerValue : 0);
             insertAreaCommand.ExecuteNonQuery();
@@ -652,6 +743,54 @@ public class SqliteStore
                     WHERE id IN($way_ids);".Replace("$way_ids", string.Join(',', outerWayIds));
             wayAreaParent.Parameters.AddWithValue("$area_parent_id", relation.Id);
             wayAreaParent.ExecuteNonQuery();
+        }
+        transaction.Commit();
+    }
+
+    private void SaveAreaBatch(SqliteConnection connection, List<Way> wayBatch)
+    {
+
+        var wayIds = wayBatch.Select(w => w.Id).ToArray();
+
+        var wayNodes = wayIds.Chunk(1000).SelectMany(chunk =>
+        {
+            var wayNodes = FetchNodesByWayIds(chunk.ToArray());
+            return wayNodes;
+        }).ToDictionary();
+
+        using var transaction = connection.BeginTransaction();
+
+        foreach (var way in wayBatch)
+        {
+            var orderedCoords = new List<Coord>();
+            orderedCoords.AddRange(Coord.FromNodes(wayNodes[way.Id]));
+
+            if (orderedCoords.Count == 0)
+            {
+                Console.WriteLine($"Failed to find any coords for way {way.Id}");
+                continue;
+            }
+
+            var coords = string.Join(";", orderedCoords.Select(id => $"{id.Lat},{id.Lon}"));
+            var wayTags = way.TagsToDict();
+            using var insertAreaCommand = connection.CreateCommand();
+            insertAreaCommand.CommandText = @"
+                    INSERT INTO area (id, visible, version, change_set, timestamp, user, uid, coords, name, suggested_colour, tile_id, layer)
+                        VALUES($id, $visible, $version, $change_set, $timestamp, $user, $uid, $coords, $name, $suggested_colour, $tile_id, $layer);
+                    ";
+            insertAreaCommand.Parameters.AddWithValue("$id", way.Id);
+            insertAreaCommand.Parameters.AddWithValue("$visible", way.Visible as object ?? DBNull.Value);
+            insertAreaCommand.Parameters.AddWithValue("$version", way.Version as object ?? DBNull.Value);
+            insertAreaCommand.Parameters.AddWithValue("$change_set", way.ChangeSet);
+            insertAreaCommand.Parameters.AddWithValue("$timestamp", way.Timestamp?.ToString("yyyy-MM-ddTHH:mm:ssZ") as object ?? DBNull.Value);
+            insertAreaCommand.Parameters.AddWithValue("$user", way.User as object ?? DBNull.Value);
+            insertAreaCommand.Parameters.AddWithValue("$uid", way.Uid as object ?? DBNull.Value);
+            insertAreaCommand.Parameters.AddWithValue("$coords", coords);
+            insertAreaCommand.Parameters.AddWithValue("$name", wayTags.TryGetValue("name", out string? nameValue) ? nameValue : DBNull.Value);
+            insertAreaCommand.Parameters.AddWithValue("$suggested_colour", calcSuggestedColour(wayTags));
+            insertAreaCommand.Parameters.AddWithValue("$tile_id", tileService.CalcTileId(orderedCoords.Average(n => n.Lat), orderedCoords.Average(n => n.Lon)));
+            insertAreaCommand.Parameters.AddWithValue("$layer", wayTags.TryGetValue("layer", out string? layerValue) ? layerValue : 0);
+            insertAreaCommand.ExecuteNonQuery();
         }
         transaction.Commit();
     }

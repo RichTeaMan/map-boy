@@ -26,21 +26,6 @@ public class Program
 
         app.UseHttpsRedirection();
 
-        app.MapGet("/ways", async (httpContext) =>
-        {
-            var store = createSqliteStore();
-            long[]? tileIds = null;
-            if (httpContext.Request.Query.TryGetValue("tileId", out var tileIdStr))
-            {
-                tileIds = new[] { long.Parse(tileIdStr) };
-            }
-
-            var ways = store.FetchWays(null, tileIds);
-            var resp = ways.Where(w => w.ClosedLoop && w.AreaParentId == null).ToArray();
-            await httpContext.Response.WriteAsJsonAsync(resp);
-        })
-        .WithName("GetWays");
-
         app.MapGet("/areas", async (httpContext) =>
         {
             var store = createSqliteStore();
@@ -67,9 +52,6 @@ public class Program
             return new { tileIds = tileService.CalcTileIdsInRangeSpiral(lat1, lon1, lat2, lon2).ToArray() };
         })
         .WithName("GetTileIdRange");
-
-
-
 
         app.Run();
     }

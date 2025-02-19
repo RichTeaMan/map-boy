@@ -56,37 +56,8 @@ static func create_mesh_from_polygon(polygon_points: Array[Vector2]):
 
     var mesh = ArrayMesh.new()
     mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-    
 
     return mesh
-
-static func create_way_node(way, vertices: Array[Vector2]):
-    
-    if vertices.size() == 0:
-        printerr("Way %s: %s, has no coordinates." % [way.id, way.name])
-        return null
-    if way.closedLoop:
-        if vertices.size() < 3:
-            printerr("Closed loop way must have at least 3 nodes.")
-            return null;
-        var mesh = create_mesh_from_polygon(vertices)
-        if mesh == null: # Handle the triangulation error
-            return
-
-        var meshInstance = MeshInstance3D.new()
-        meshInstance.mesh = mesh
-        mesh.surface_set_material(0, fetch_material(way.suggestedColour))
-        return meshInstance
-    else:
-        if vertices.size() == 0:
-            printerr("Way %s: %s, has no coordinates." % [way.id, way.name])
-            return null
-        var draw_3d = Draw3D.new()
-        var vertices_3d = []
-        for v in vertices:
-            vertices_3d.append(Vector3(v.x, 0.0, v.y))
-        draw_3d.draw_line(vertices_3d, Color.PURPLE, fetch_material(way.suggestedColour))
-        return draw_3d
 
 static func create_area_node(area, vertices: Array[Vector2]):
     if vertices.size() == 0:

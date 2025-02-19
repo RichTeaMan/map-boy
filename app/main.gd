@@ -1,6 +1,7 @@
 extends Node3D
 
 const coord_factor = 1000
+const layer_factor = 0.1
 
 var loaded_tiles = []
 
@@ -87,7 +88,8 @@ func _on_ways_http_request_request_completed(_result, _response_code, _headers, 
     var ways = JSON.parse_string(body.get_string_from_utf8())
     if ways != null:
         for way in ways:
-            if way.suggestedColour == "white":
+            if way.suggestedColour == "white" && way.layer >= 0:
+                print("Way is white: %s" % way.id)
                 continue
             var vector_2d_list: Array[Vector2] = []
             for c in way.coordinates:
@@ -98,6 +100,9 @@ func _on_ways_http_request_request_completed(_result, _response_code, _headers, 
             var way_node = WayRender.create_way_node(way, vector_2d_list)
             if way_node != null:
                 $map.add_child(way_node)
+                if way.suggestedColour == "red" || way.suggestedColour == "dark-green" || way.suggestedColour == "grey" || way.suggestedColour == "light-grey":
+                    way_node.position.y += 0.05
+                way_node.position.y += layer_factor * way.layer
     print("ways response processed")
     way_pending = false
 
@@ -106,7 +111,8 @@ func _on_areas_http_request_request_completed(_result, _response_code, _headers,
     var areas = JSON.parse_string(body.get_string_from_utf8())
     if areas != null:
         for area in areas:
-            if area.suggestedColour == "white":
+            if area.suggestedColour == "white" && area.layer >= 0:
+                print("Area is white: %s" % area.id)
                 continue
             var vector_list: Array[Vector3] = []
             var vector_2d_list: Array[Vector2] = []
@@ -119,12 +125,15 @@ func _on_areas_http_request_request_completed(_result, _response_code, _headers,
             var area_node = WayRender.create_area_node(area, vector_2d_list)
             if area_node != null:
                 $map.add_child(area_node)
+                if area.suggestedColour == "red" || area.suggestedColour == "dark-green" || area.suggestedColour == "grey" || area.suggestedColour == "light-grey":
+                    area_node.position.y += 0.05
+                area_node.position.y += layer_factor * area.layer
 
     print("area response processed")
     area_pending = false
 
 func _on_tiles_http_request_request_completed(_result, _response_code, _headers, body):
-    print("tile response...")
+    #print("tile response...")
     var tileResponse = JSON.parse_string(body.get_string_from_utf8())
     for tileId in tileResponse.tileIds:
         if loaded_tiles.has(tileId):
@@ -132,5 +141,5 @@ func _on_tiles_http_request_request_completed(_result, _response_code, _headers,
         way_queue.append(tileId)
         area_queue.append(tileId)
         loaded_tiles.append(tileId)
-    print("tile response processed")
+    #print("tile response processed")
     tiles_pending = false

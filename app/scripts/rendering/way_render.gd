@@ -18,8 +18,12 @@ static func fetch_material(colour: String):
                 material.albedo_color = Color.FLORAL_WHITE
             "green":
                 material.albedo_color = Color.LIGHT_GREEN
+            "dark-green":
+                material.albedo_color = Color.OLIVE_DRAB
             "grey":
                 material.albedo_color = Color.GRAY
+            "light-grey":
+                material.albedo_color = Color.LIGHT_GRAY
             "yellow":
                 material.albedo_color = Color.YELLOW
             "purple":
@@ -28,22 +32,13 @@ static func fetch_material(colour: String):
     return material
 
 static func create_mesh_from_polygon(polygon_points: Array[Vector2]):
-    #var indices = Geometry2D.triangulate_delaunay(polygon_points)
-    #print("mesh")
-    #var packed = PackedVector2Array()
-    #for point in polygon_points:
-    #    packed.append(point)
-    #    print(point)
-        
         
     var relative_v := PackedVector2Array()
     var r = polygon_points[0]
     for v in polygon_points:
         var new_v = v - r
         relative_v.append(new_v)
-    #print(relative_v)
     var indices = Geometry2D.triangulate_polygon(relative_v)
-    #print(indices)
 
     if indices.is_empty():
         printerr("Error: Triangulation failed.")
@@ -61,6 +56,7 @@ static func create_mesh_from_polygon(polygon_points: Array[Vector2]):
 
     var mesh = ArrayMesh.new()
     mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+    
 
     return mesh
 

@@ -5,7 +5,7 @@ public class Program
 
     private static SqliteStore createSqliteStore()
     {
-        return new SqliteStore("/home/tom/projects/map-boy/osm-api/osm.db");
+        return new SqliteStore("osm.db");
     }
 
     public static void Main(string[] args)
@@ -64,7 +64,7 @@ public class Program
         app.MapGet("/tileIdRange/{lat1:double}/{lon1:double}/{lat2:double}/{lon2:double}", (double lat1, double lon1, double lat2, double lon2) =>
         {
             var tileService = new TileService();
-            return new { tileIds = tileService.CalcTileIdsInRange(lat1, lon1, lat2, lon2).ToArray() };
+            return new { tileIds = tileService.CalcTileIdsInRangeSpiral(lat1, lon1, lat2, lon2).ToArray() };
         })
         .WithName("GetTileIdRange");
 

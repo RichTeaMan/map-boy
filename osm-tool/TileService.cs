@@ -52,4 +52,65 @@ public class TileService
             }
         }
     }
+
+    public IEnumerable<long> CalcTileIdsInRangeSpiral(double lat1, double lon1, double lat2, double lon2)
+    {
+        CalcRowColumn(lat1, lon1, out var colStart, out var rowStart);
+        CalcRowColumn(lat2, lon2, out var colEnd, out var rowEnd);
+
+        var centerCol = (colStart + colEnd) / 2;
+        var centerRow = (rowStart + rowEnd) / 2;
+
+        var radius = Math.Max(Math.Abs(colEnd - colStart), Math.Abs(rowEnd - rowStart)) / 2;
+        var currentCol = centerCol;
+        var currentRow = centerRow;
+        var centralTile = currentRow * WIDTH + currentCol;
+        yield return centralTile;
+
+        int currentRadius = 1;
+        while (currentRadius <= radius)
+        {
+            for (var x = -currentRadius; x <= currentRadius; x++)
+            {
+                var tileX = currentCol - x;
+                var tileY = currentRow - currentRadius;
+                if (tileX >= colStart && tileX <= colEnd && tileY >= rowStart && tileY <= rowEnd)
+                {
+                    var tile = tileY * WIDTH + tileX;
+                    yield return tile;
+                }
+            }
+            for (var y = -currentRadius + 1; y < currentRadius; y++)
+            {
+                var tileX = currentCol + currentRadius;
+                var tileY = currentRow + y;
+                if (tileX >= colStart && tileX <= colEnd && tileY >= rowStart && tileY <= rowEnd)
+                {
+                    var tile = tileY * WIDTH + tileX;
+                    yield return tile;
+                }
+            }
+            for (var x = -currentRadius; x <= currentRadius; x++)
+            {
+                var tileX = currentCol + x;
+                var tileY = currentRow + currentRadius;
+                if (tileX >= colStart && tileX <= colEnd && tileY >= rowStart && tileY <= rowEnd)
+                {
+                    var tile = tileY * WIDTH + tileX;
+                    yield return tile;
+                }
+            }
+            for (var y = -currentRadius + 1; y < currentRadius; y++)
+            {
+                var tileX = currentCol - currentRadius;
+                var tileY = currentRow - y;
+                if (tileX >= colStart && tileX <= colEnd && tileY >= rowStart && tileY <= rowEnd)
+                {
+                    var tile = tileY * WIDTH + tileX;
+                    yield return tile;
+                }
+            }
+            currentRadius++;
+        }
+    }
 }

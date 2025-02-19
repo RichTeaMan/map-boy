@@ -12,7 +12,7 @@ public static class SqliteDataReaderUtils
         return (T)t;
     }
 
-        public static string? NullableString(this SqliteDataReader r, int ord)
+    public static string? NullableString(this SqliteDataReader r, int ord)
     {
         var t = r.GetValue(ord);
         if (t == DBNull.Value)
@@ -20,5 +20,10 @@ public static class SqliteDataReaderUtils
             return null;
         }
         return (string)t;
+    }
+    
+    public static string? NullableString(this SqliteDataReader r, string name)
+    {
+        return NullableString(r, r.GetOrdinal(name));
     }
 }

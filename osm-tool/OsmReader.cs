@@ -174,8 +174,8 @@ public class OsmReader : IReader
                     if (reader.NodeType == XmlNodeType.Element && reader.Name == "member")
                     {
                         string? nodeRef = reader.GetAttribute("ref");
-                        string role = reader.GetAttribute("role")!;
-                        string type = reader.GetAttribute("type")!;
+                        string role = reader.GetAttribute("role")!.ToLower();
+                        string type = reader.GetAttribute("type")!.ToLower();
                         members.Add(new OsmRelationMember
                         {
                             Id = long.Parse(nodeRef),

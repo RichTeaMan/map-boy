@@ -34,12 +34,9 @@ public class Program
             Console.WriteLine("Unknown file format");
             return;
         }
-        Console.WriteLine("Building database...");
-        var c = reader.IterateNodes().Count();
-        Console.WriteLine($"Node count: {c}");
-
         string dbPath = (datafile + ".db").Split("/").Last();
         File.Delete(dbPath);
+        Console.WriteLine("Building database...");
         var store = new SqliteStore(dbPath);
 
         Console.WriteLine("Saving nodes...");

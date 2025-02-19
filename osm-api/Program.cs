@@ -36,7 +36,7 @@ public class Program
             }
 
             var ways = store.FetchWays(null, tileIds);
-            var resp = ways.Where(w => w.ClosedLoop).ToArray();
+            var resp = ways.Where(w => w.ClosedLoop && w.AreaParentId == null).ToArray();
             await httpContext.Response.WriteAsJsonAsync(resp);
         })
         .WithName("GetWays");

@@ -75,8 +75,8 @@ public class OsmPbfReader : IReader
                 Members = osmRelation.Members.Select(m => new OsmRelationMember
                 {
                     Id = m.Id,
-                    Role = m.Role,
-                    Type = m.Type.ToString()
+                    Role = m.Role.ToLower(),
+                    Type = m.Type.ToString().ToLower()
                 }).ToList().AsReadOnly(),
                 Tags = osmRelation.Tags.ToDictionary(t => t.Key, t => t.Value)
             };

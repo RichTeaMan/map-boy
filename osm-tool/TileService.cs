@@ -2,6 +2,12 @@ using System.Diagnostics;
 
 namespace OsmTool;
 
+public class Tile
+{
+    public long Id { get; set; }
+    public double Lat { get; set; }
+    public double Lon { get; set; }
+}
 public class TileService
 {
 
@@ -38,7 +44,7 @@ public class TileService
         Debug.Assert(lonTile >= 0 && lonTile < HEIGHT);
     }
 
-    public IEnumerable<long> CalcTileIdsInRange(double lat1, double lon1, double lat2, double lon2)
+    public IEnumerable<Tile> CalcTileIdsInRange(double lat1, double lon1, double lat2, double lon2)
     {
         CalcRowColumn(lat1, lon1, out var colStart, out var rowStart);
         CalcRowColumn(lat2, lon2, out var colEnd, out var rowEnd);
@@ -48,12 +54,12 @@ public class TileService
             for (var col = colStart; col <= colEnd; col++)
             {
                 var tile = row * WIDTH + col;
-                yield return tile;
+                yield return new Tile { Id = tile, Lat = (row / (double)LAT_DEGREE_DIVISION) - 180.0, Lon = (col / (double)LON_DEGREE_DIVISION) - 180.0 };
             }
         }
     }
 
-    public IEnumerable<long> CalcTileIdsInRangeSpiral(double lat1, double lon1, double lat2, double lon2)
+    public IEnumerable<Tile> CalcTileIdsInRangeSpiral(double lat1, double lon1, double lat2, double lon2)
     {
         CalcRowColumn(lat1, lon1, out var colStart, out var rowStart);
         CalcRowColumn(lat2, lon2, out var colEnd, out var rowEnd);
@@ -65,7 +71,7 @@ public class TileService
         var currentCol = centerCol;
         var currentRow = centerRow;
         var centralTile = currentRow * WIDTH + currentCol;
-        yield return centralTile;
+        yield return new Tile { Id = centralTile, Lat = (currentRow / (double)LAT_DEGREE_DIVISION) - 180.0, Lon = (currentCol / (double)LON_DEGREE_DIVISION) - 180.0 };
 
         int currentRadius = 1;
         while (currentRadius <= radius)
@@ -77,7 +83,7 @@ public class TileService
                 if (tileX >= colStart && tileX <= colEnd && tileY >= rowStart && tileY <= rowEnd)
                 {
                     var tile = tileY * WIDTH + tileX;
-                    yield return tile;
+                    yield return new Tile { Id = tile, Lat = (tileX / (double)LAT_DEGREE_DIVISION) - 180.0, Lon = (tileY / (double)LON_DEGREE_DIVISION) - 180.0 };
                 }
             }
             for (var y = -currentRadius + 1; y < currentRadius; y++)
@@ -87,7 +93,7 @@ public class TileService
                 if (tileX >= colStart && tileX <= colEnd && tileY >= rowStart && tileY <= rowEnd)
                 {
                     var tile = tileY * WIDTH + tileX;
-                    yield return tile;
+                    yield return new Tile { Id = tile, Lat = (tileX / (double)LAT_DEGREE_DIVISION) - 180.0, Lon = (tileY / (double)LON_DEGREE_DIVISION) - 180.0 };
                 }
             }
             for (var x = -currentRadius; x <= currentRadius; x++)
@@ -97,7 +103,7 @@ public class TileService
                 if (tileX >= colStart && tileX <= colEnd && tileY >= rowStart && tileY <= rowEnd)
                 {
                     var tile = tileY * WIDTH + tileX;
-                    yield return tile;
+                    yield return new Tile { Id = tile, Lat = (tileX / (double)LAT_DEGREE_DIVISION) - 180.0, Lon = (tileY / (double)LON_DEGREE_DIVISION) - 180.0 };
                 }
             }
             for (var y = -currentRadius + 1; y < currentRadius; y++)
@@ -107,7 +113,7 @@ public class TileService
                 if (tileX >= colStart && tileX <= colEnd && tileY >= rowStart && tileY <= rowEnd)
                 {
                     var tile = tileY * WIDTH + tileX;
-                    yield return tile;
+                    yield return new Tile { Id = tile, Lat = (tileX / (double)LAT_DEGREE_DIVISION) - 180.0, Lon = (tileY / (double)LON_DEGREE_DIVISION) - 180.0 };
                 }
             }
             currentRadius++;

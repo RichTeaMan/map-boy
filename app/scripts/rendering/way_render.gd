@@ -48,7 +48,7 @@ static func create_mesh_from_polygon(polygon_points: Array[Vector2]):
     arrays.resize(Mesh.ARRAY_MAX)
 
     var vertices = PackedVector3Array()
-    for point in polygon_points:
+    for point in relative_v:
         vertices.append(Vector3(point.x, 0, point.y))
 
     arrays[Mesh.ARRAY_VERTEX] = vertices
@@ -59,7 +59,7 @@ static func create_mesh_from_polygon(polygon_points: Array[Vector2]):
 
     return mesh
 
-static func create_area_node(area, vertices: Array[Vector2]):
+static func create_area_node(area, vertices: Array[Vector2]) -> MapAreaNode:
     if vertices.size() == 0:
         printerr("Area %s: %s, has no coordinates." % [area.id, area.name])
         return null
@@ -70,7 +70,11 @@ static func create_area_node(area, vertices: Array[Vector2]):
     if mesh == null: # Handle the triangulation error
         return
 
-    var meshInstance = MeshInstance3D.new()
-    meshInstance.mesh = mesh
+    var mesh_instance = MeshInstance3D.new()
+    mesh_instance.mesh = mesh
     mesh.surface_set_material(0, fetch_material(area.suggestedColour))
-    return meshInstance
+    var map_area_node = MapAreaNode.new()
+    map_area_node.name = "area-%s" % area.id
+    map_area_node.add_child(mesh_instance)
+    map_area_node.position = Vector3(vertices[0].x, 0.0, vertices[0].y)
+    return map_area_node

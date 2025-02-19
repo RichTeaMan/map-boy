@@ -49,7 +49,7 @@ public class Program
         app.MapGet("/tileIdRange/{lat1:double}/{lon1:double}/{lat2:double}/{lon2:double}", (double lat1, double lon1, double lat2, double lon2) =>
         {
             var tileService = new TileService();
-            return new { tileIds = tileService.CalcTileIdsInRangeSpiral(lat1, lon1, lat2, lon2).ToArray() };
+            return new { tiles = tileService.CalcTileIdsInRangeSpiral(lat1, lon1, lat2, lon2).ToArray() };
         })
         .WithName("GetTileIdRange");
 

@@ -3,14 +3,18 @@ extends Node3D
 const coord_factor = 1000
 const layer_factor = 0.1
 
-var loaded_tiles = []
+var loaded_tiles = {}
 
 var area_queue = []
-var way_pending = false
 var area_pending = false
 var tiles_pending = false
 var last_pos_lat = null
 var last_pos_long = null
+var last_purge_index = 0
+## Maximum number of entities to check for purging in a single tick
+var purge_amount = 500
+
+var load_window = 0.02
 
 func _ready():
     
@@ -27,11 +31,15 @@ func _ready():
 
 func _process(_delta: float):
     
+    # load map
     if !area_pending && area_queue.size() > 0:
         area_pending = true
         var tile_id = area_queue.pop_front()
         print("Requesting area for tile %s." % tile_id)
         $areasHttpRequest.request("http://127.0.0.1:5291/areas?tileId=%s" % tile_id)
+    
+    # purge map
+    purge_map_area_nodes()
     
     # camera movement
     
@@ -57,7 +65,7 @@ func refresh_tile_queue():
         return
     
     # search for tiles 0.1 degrees around camera postion, which is very roughly similar to 1.7km
-    var deg_range = 0.01
+    var deg_range = load_window
     var current_lat = $Camera3D.position.x / coord_factor
     var current_lon = $Camera3D.position.z / coord_factor
     
@@ -74,6 +82,36 @@ func refresh_tile_queue():
     last_pos_lat = current_lat
     last_pos_long = current_lon
 
+func purge_map_area_nodes():
+    
+    # search for tiles 0.1 degrees around camera postion, which is very roughly similar to 1.7km
+    var deg_range = load_window * coord_factor * 2.0
+    var current_lat = $Camera3D.position.x
+    var current_lon = $Camera3D.position.z
+    
+    var lat1 = current_lat - deg_range
+    var lon1 = current_lon - deg_range
+    var lat2 = current_lat + deg_range
+    var lon2 = current_lon + deg_range
+    
+    var map_area_nodes: Array[Node] = $map.get_children()
+    var purge_limit = min(map_area_nodes.size(), last_purge_index + purge_amount)
+    var i = last_purge_index
+    while i < purge_limit:
+        var map_area_node = map_area_nodes[i]
+        if map_area_node.position.x < lat1 || map_area_node.position.x > lat2 || map_area_node.position.z < lon1 || map_area_node.position.z > lon2:
+            map_area_node.queue_free()
+        i += 1
+
+    last_purge_index += purge_limit
+    if last_purge_index > map_area_nodes.size():
+        last_purge_index = 0
+    
+    for tile_marker_node: Node3D in $tile_markers.get_children():
+        if tile_marker_node.position.x < lat1 || tile_marker_node.position.x > lat2 || tile_marker_node.position.z < lon1 || tile_marker_node.position.z > lon2:
+            tile_marker_node.queue_free()
+            loaded_tiles.erase(tile_marker_node.tile_id)
+
 func _on_areas_http_request_request_completed(_result, _response_code, _headers, body):
     print("area response...")
     var areas = JSON.parse_string(body.get_string_from_utf8())
@@ -82,20 +120,18 @@ func _on_areas_http_request_request_completed(_result, _response_code, _headers,
             if area.suggestedColour == "white" && area.layer >= 0:
                 print("Area is white: %s" % area.id)
                 continue
-            var vector_list: Array[Vector3] = []
             var vector_2d_list: Array[Vector2] = []
             for c in area.coordinates:
                 var lat = c.lat * coord_factor
                 var lon = c.lon * coord_factor
                 
-                vector_list.append(Vector3(lat, 0.0, lon))
                 vector_2d_list.append(Vector2(lat, lon))
             var area_node = WayRender.create_area_node(area, vector_2d_list)
             if area_node != null:
                 $map.add_child(area_node)
-                if area.suggestedColour == "red" || area.suggestedColour == "dark-green" || area.suggestedColour == "grey" || area.suggestedColour == "light-grey":
-                    area_node.position.y += 0.05
-                area_node.position.y += layer_factor * area.layer
+                #if area.suggestedColour == "red" || area.suggestedColour == "dark-green" || area.suggestedColour == "grey" || area.suggestedColour == "light-grey":
+                #    area_node.position.y += 0.05
+                #area_node.position.y += layer_factor * area.layer
 
     print("area response processed")
     area_pending = false
@@ -103,10 +139,16 @@ func _on_areas_http_request_request_completed(_result, _response_code, _headers,
 func _on_tiles_http_request_request_completed(_result, _response_code, _headers, body):
     #print("tile response...")
     var tileResponse = JSON.parse_string(body.get_string_from_utf8())
-    for tileId in tileResponse.tileIds:
-        if loaded_tiles.has(tileId):
+    for tile in tileResponse.tiles:
+        var tile_id: int = tile.id
+        if loaded_tiles.has(tile_id):
             continue
-        area_queue.append(tileId)
-        loaded_tiles.append(tileId)
+        area_queue.append(tile_id)
+        var tile_marker = TileMarkerNode.new()
+        tile_marker.tile_id = tile_id
+        tile_marker.position = Vector3(tile.lat * coord_factor, 0.0, tile.lon * coord_factor)
+        tile_marker.name = "tile-%s" % tile_id
+        $tile_markers.add_child(tile_marker)
+        loaded_tiles[tile_id] = true
     #print("tile response processed")
     tiles_pending = false

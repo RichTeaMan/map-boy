@@ -70,14 +70,11 @@ func shape_draw():
             "suggestedColour": "purple"
         }
         var area_node = WayRender.create_area_node(area, coords)
-        var way_node = WayRender.create_way_node(way, coords)
-        if area_node != null || way_node!= null:
+        if area_node != null:
             for child in %shapes.get_children():
                 child.queue_free()
         if area_node != null && %area_chb.button_pressed:
             %shapes.add_child(area_node)
-        if way_node != null && %lines_chb.button_pressed:
-            %shapes.add_child(way_node)
 
 func _on_factor_edit_text_changed(new_text: String) -> void:
     shape_draw()

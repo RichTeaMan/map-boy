@@ -546,6 +546,7 @@ public class SqliteStore
             createTableCommand.CommandText = @"
             CREATE TABLE IF NOT EXISTS area (
             id INTEGER PRIMARY KEY,
+            source TEXT NOT NULL,
             visible INTEGER NULL,
             version INTEGER NULL,
             change_set INTEGER NULL,
@@ -719,10 +720,10 @@ public class SqliteStore
             var coords = string.Join(";", orderedCoords.Select(id => $"{id.Lat},{id.Lon}"));
             using var insertAreaCommand = connection.CreateCommand();
             insertAreaCommand.CommandText = @"
-                    INSERT INTO area (id, visible, version, change_set, timestamp, user, uid, coords, name, suggested_colour, tile_id, layer)
-                        VALUES($id, $visible, $version, $change_set, $timestamp, $user, $uid, $coords, $name, $suggested_colour, $tile_id, $layer);
+                    INSERT INTO area (source, visible, version, change_set, timestamp, user, uid, coords, name, suggested_colour, tile_id, layer)
+                        VALUES($source, $visible, $version, $change_set, $timestamp, $user, $uid, $coords, $name, $suggested_colour, $tile_id, $layer);
                     ";
-            insertAreaCommand.Parameters.AddWithValue("$id", relation.Id);
+            insertAreaCommand.Parameters.AddWithValue("$source", $"relation-{relation.Id}");
             insertAreaCommand.Parameters.AddWithValue("$visible", relation.Visible as object ?? DBNull.Value);
             insertAreaCommand.Parameters.AddWithValue("$version", relation.Version as object ?? DBNull.Value);
             insertAreaCommand.Parameters.AddWithValue("$change_set", relation.ChangeSet);
@@ -775,10 +776,10 @@ public class SqliteStore
             var wayTags = way.TagsToDict();
             using var insertAreaCommand = connection.CreateCommand();
             insertAreaCommand.CommandText = @"
-                    INSERT INTO area (id, visible, version, change_set, timestamp, user, uid, coords, name, suggested_colour, tile_id, layer)
-                        VALUES($id, $visible, $version, $change_set, $timestamp, $user, $uid, $coords, $name, $suggested_colour, $tile_id, $layer);
+                    INSERT INTO area (source, visible, version, change_set, timestamp, user, uid, coords, name, suggested_colour, tile_id, layer)
+                        VALUES($source, $visible, $version, $change_set, $timestamp, $user, $uid, $coords, $name, $suggested_colour, $tile_id, $layer);
                     ";
-            insertAreaCommand.Parameters.AddWithValue("$id", way.Id);
+            insertAreaCommand.Parameters.AddWithValue("$source", $"way-{way.Id}");
             insertAreaCommand.Parameters.AddWithValue("$visible", way.Visible as object ?? DBNull.Value);
             insertAreaCommand.Parameters.AddWithValue("$version", way.Version as object ?? DBNull.Value);
             insertAreaCommand.Parameters.AddWithValue("$change_set", way.ChangeSet);

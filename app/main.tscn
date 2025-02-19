@@ -13,10 +13,16 @@ ambient_light_energy = 7.65
 script = ExtResource("1_4rdyb")
 
 [node name="waysHttpRequest" type="HTTPRequest" parent="."]
+download_chunk_size = 2097152
+use_threads = true
 
 [node name="areasHttpRequest" type="HTTPRequest" parent="."]
+download_chunk_size = 2097152
+use_threads = true
 
 [node name="tilesIdRangeHttpRequest" type="HTTPRequest" parent="."]
+download_chunk_size = 2097152
+use_threads = true
 
 [node name="map" type="Node3D" parent="."]
 

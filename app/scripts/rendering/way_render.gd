@@ -11,23 +11,42 @@ static func fetch_material(colour: String):
         material.albedo_color = Color.YELLOW
         match colour:
             "red":
-                material.albedo_color = Color.RED
+                material.albedo_color = Color.ORANGE_RED
             "blue":
-                material.albedo_color = Color.AQUA
+                material.albedo_color = Color.LIGHT_BLUE
             "white":
                 material.albedo_color = Color.FLORAL_WHITE
             "green":
-                material.albedo_color = Color.WEB_GREEN
+                material.albedo_color = Color.LIGHT_GREEN
             "grey":
                 material.albedo_color = Color.GRAY
+            "yellow":
+                material.albedo_color = Color.YELLOW
+            "purple":
+                material.albedo_color = Color.PURPLE
         material_map[colour] = material
     return material
 
 static func create_mesh_from_polygon(polygon_points: Array[Vector2]):
-    var indices = Geometry2D.triangulate_delaunay(polygon_points)
+    #var indices = Geometry2D.triangulate_delaunay(polygon_points)
+    #print("mesh")
+    #var packed = PackedVector2Array()
+    #for point in polygon_points:
+    #    packed.append(point)
+    #    print(point)
+        
+        
+    var relative_v := PackedVector2Array()
+    var r = polygon_points[0]
+    for v in polygon_points:
+        var new_v = v - r
+        relative_v.append(new_v)
+    #print(relative_v)
+    var indices = Geometry2D.triangulate_polygon(relative_v)
+    #print(indices)
 
     if indices.is_empty():
-        #print("Error: Triangulation failed.")
+        printerr("Error: Triangulation failed.")
         return null
 
     var arrays = []

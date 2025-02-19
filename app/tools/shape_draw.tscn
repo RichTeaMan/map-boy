@@ -1,0 +1,60 @@
+[gd_scene load_steps=2 format=3 uid="uid://csnuxjqsm4vpy"]
+
+[ext_resource type="Script" path="res://tools/shape_draw.gd" id="1_fynvl"]
+
+[node name="ShapeDraw" type="Node3D"]
+script = ExtResource("1_fynvl")
+
+[node name="shapes" type="Node3D" parent="."]
+unique_name_in_owner = true
+
+[node name="CanvasLayer" type="CanvasLayer" parent="."]
+
+[node name="MarginContainer" type="MarginContainer" parent="CanvasLayer"]
+unique_name_in_owner = true
+anchors_preset = 11
+anchor_left = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -200.0
+grow_horizontal = 0
+grow_vertical = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="CanvasLayer/MarginContainer"]
+layout_mode = 2
+
+[node name="factor_edit" type="LineEdit" parent="CanvasLayer/MarginContainer/VBoxContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "1000"
+
+[node name="rotate_button" type="Button" parent="CanvasLayer/MarginContainer/VBoxContainer"]
+layout_mode = 2
+text = "Rotate"
+
+[node name="area_chb" type="CheckButton" parent="CanvasLayer/MarginContainer/VBoxContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+button_pressed = true
+text = "Show Area"
+
+[node name="lines_chb" type="CheckButton" parent="CanvasLayer/MarginContainer/VBoxContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+button_pressed = true
+text = "Show Lines"
+
+[node name="coords_text_edit" type="TextEdit" parent="CanvasLayer/MarginContainer/VBoxContainer"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(200, 0)
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="Camera3D" type="Camera3D" parent="."]
+transform = Transform3D(-4.37114e-08, 1, 4.37114e-08, 0, -4.37114e-08, 1, 1, 4.37114e-08, 1.91069e-15, 0, 5, 0)
+
+[connection signal="text_changed" from="CanvasLayer/MarginContainer/VBoxContainer/factor_edit" to="." method="_on_factor_edit_text_changed"]
+[connection signal="pressed" from="CanvasLayer/MarginContainer/VBoxContainer/rotate_button" to="." method="_on_rotate_button_pressed"]
+[connection signal="toggled" from="CanvasLayer/MarginContainer/VBoxContainer/area_chb" to="." method="_on_chb_toggled"]
+[connection signal="toggled" from="CanvasLayer/MarginContainer/VBoxContainer/lines_chb" to="." method="_on_chb_toggled"]
+[connection signal="text_changed" from="CanvasLayer/MarginContainer/VBoxContainer/coords_text_edit" to="." method="_on_text_edit_text_changed"]

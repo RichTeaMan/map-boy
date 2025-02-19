@@ -73,8 +73,8 @@ func clear() -> void:
     mesh.clear_surfaces()
 
 
-func _points_test(clear: bool = false) -> void:
-    if clear: clear()
+func _points_test(p_clear: bool = false) -> void:
+    if p_clear: clear()
 
     mesh.surface_begin(Mesh.PRIMITIVE_POINTS, null)
     for i in 100:
@@ -83,8 +83,8 @@ func _points_test(clear: bool = false) -> void:
     mesh.surface_end()
 
 
-func _line_test(clear: bool = false) -> void:
-    if clear: clear()
+func _line_test(p_clear: bool = false) -> void:
+    if p_clear: clear()
 
     mesh.surface_begin(Mesh.PRIMITIVE_LINE_STRIP, null)
     for i in 50:
@@ -170,7 +170,7 @@ func _draw_triangles(
         material = _default_material
 
     var last_surface_idx = mesh.get_surface_count() - 1
-    mesh.surface_set_material(last_surface_idx, _default_material)
+    mesh.surface_set_material(last_surface_idx, material)
 
 ################################################################################
 # draw_primitive shortcuts
@@ -220,29 +220,29 @@ func draw_line_loop(vertices: Array, color: Color = default_color) -> void:
 ## [br][br]Pass a Basis parameter to define orientation.
 ## Otherwise defaults to lying on the XZ plane.
 ##
-func circle(position: Vector3 = Vector3.ZERO,
-        basis: Basis = Basis.IDENTITY, color: Color = default_color) -> void:
+func circle(p_position: Vector3 = Vector3.ZERO,
+        p_basis: Basis = Basis.IDENTITY, color: Color = default_color) -> void:
     # by default, this is a circle on the XZ plane.
     # this seems to make most sense in 3d as a highlight of objects
 
     var resolution = circle_resolution
-    var transform = Transform3D(basis, position)
+    var l_transform = Transform3D(p_basis, p_position)
 
-    var circle = []
+    var circle_points = []
     for i in resolution:
         var angle = TAU / resolution * i
         var angle_vector = Vector3(cos(angle), 0, sin(angle))
-        angle_vector = transform * angle_vector
-        circle.append(angle_vector)
+        angle_vector = l_transform * angle_vector
+        circle_points.append(angle_vector)
 
-    draw_line_loop(circle, color)
+    draw_line_loop(circle_points, color)
 
 
 ###############################
 # ARC
 
 func _compute_arc(angle_from: float, angle_to: float,
-        transform: Transform3D = Transform3D.IDENTITY) -> PackedVector3Array:
+        p_transform: Transform3D = Transform3D.IDENTITY) -> PackedVector3Array:
     # angles in radians, obviously
 
     var arc2 = PackedVector2Array()
@@ -267,7 +267,7 @@ func _compute_arc(angle_from: float, angle_to: float,
 
     # apply 3d transform
     for i in arc3.size():
-        arc3[i] = transform * arc3[i]
+        arc3[i] = p_transform * arc3[i]
 
     return arc3
 
@@ -281,20 +281,20 @@ func _compute_arc(angle_from: float, angle_to: float,
 ## [br][br]If [code]draw_origin[/code] is true, also draw the origin point
 ## and connect it with two lines on each end (a circular sector).
 ##
-func arc(position: Vector3, basis: Basis, angle_from: float, angle_to: float,
+func arc(p_position: Vector3, p_basis: Basis, angle_from: float, angle_to: float,
         draw_origin: bool = false, color: Color = default_color) -> void:
 
-    var arc: PackedVector3Array
-    var transform = Transform3D(basis, position)
+    var l_arc: PackedVector3Array
+    var l_transform = Transform3D(p_basis, p_position)
 
     if draw_origin:
-        arc = PackedVector3Array()
-        arc.push_back(transform * Vector3.ZERO)
-        arc.append_array(_compute_arc(angle_from, angle_to, transform))
-        draw_line_loop(arc, color)
+        l_arc = PackedVector3Array()
+        l_arc.push_back(l_transform * Vector3.ZERO)
+        l_arc.append_array(_compute_arc(angle_from, angle_to, l_transform))
+        draw_line_loop(l_arc, color)
     else:
-        arc = _compute_arc(angle_from, angle_to, transform)
-        draw_line(arc, color)
+        l_arc = _compute_arc(angle_from, angle_to, l_transform)
+        draw_line(l_arc, color)
 
 
 ################################
@@ -305,7 +305,7 @@ func arc(position: Vector3, basis: Basis, angle_from: float, angle_to: float,
 ## [br][br]Pass a Basis parameter to define orientation.
 ## Otherwise defaults to no orientation.
 ##
-func cube(position: Vector3 = Vector3.ZERO, basis: Basis = Basis.IDENTITY,
+func cube(p_position: Vector3 = Vector3.ZERO, p_basis: Basis = Basis.IDENTITY,
         color: Color = default_color) -> void:
 
     # https://www.khronos.org/opengl/wiki/Primitive
@@ -322,10 +322,10 @@ func cube(position: Vector3 = Vector3.ZERO, basis: Basis = Basis.IDENTITY,
         Vector3( -1, 1, -1 ),
     ]
 
-    var transform = Transform3D(basis, position)
+    var l_transform = Transform3D(p_basis, p_position)
 
     for i in vertices.size():
-        vertices[i] = transform * vertices[i]
+        vertices[i] = l_transform * vertices[i]
 
     draw_line_loop(vertices.slice(0, 4), color)
     draw_line_loop(vertices.slice(4, 8), color)
@@ -380,57 +380,57 @@ func _ensure_normalized(normal: Vector3) -> bool:
 ##
 ## [br][br][code]normal[/code] should be normalized.
 ##
-func circle_normal(position: Vector3, normal: Vector3, radius: float = 1.0,
+func circle_normal(p_position: Vector3, normal: Vector3, radius: float = 1.0,
         color: Color = default_color) -> void:
 
     if ! _ensure_normalized(normal): return
 
-    var basis = _basis_from_normal(normal)
-    basis = basis.scaled(Vector3(radius, radius, radius))
-    circle(position, basis, color)
+    var l_basis = _basis_from_normal(normal)
+    l_basis = l_basis.scaled(Vector3(radius, radius, radius))
+    circle(p_position, l_basis, color)
 
 
 ## Shortcut function to draw an arc whose plane is defined by a normal.
 ##
 ## [br][br][code]normal[/code] should be normalized.
 ##
-func arc_normal(position: Vector3, normal: Vector3, angle_from: float, angle_to: float,
+func arc_normal(p_position: Vector3, normal: Vector3, angle_from: float, angle_to: float,
         radius: float = 1.0, draw_origin: bool = false, color: Color = default_color) -> void:
 
     if ! _ensure_normalized(normal): return
 
-    var basis = _basis_from_normal(normal)
-    basis = basis.scaled(Vector3(radius, radius, radius))
-    arc(position, basis, angle_from, angle_to, draw_origin, color)
+    var l_basis = _basis_from_normal(normal)
+    l_basis = l_basis.scaled(Vector3(radius, radius, radius))
+    arc(p_position, basis, angle_from, angle_to, draw_origin, color)
 
 
 ## Shortcut function to draw a cube whose orientation is defined by a normal.
 ##
 ## [br][br][code]normal[/code] should be normalized.
 ##
-func cube_normal(position: Vector3, normal: Vector3, size: Vector3 = Vector3.ONE,
+func cube_normal(p_position: Vector3, normal: Vector3, p_size: Vector3 = Vector3.ONE,
         color: Color = default_color) -> void:
 
     if ! _ensure_normalized(normal): return
 
-    var basis = _basis_from_normal(normal)
-    basis = basis.scaled(size)
-    cube(position, basis, color)
+    var l_basis = _basis_from_normal(normal)
+    l_basis = l_basis.scaled(p_size)
+    cube(p_position, l_basis, color)
 
 
 ## Shortcut function to draw an upright cube with no rotation.
-func cube_up(position: Vector3 = Vector3.ZERO, size: Vector3 = Vector3.ONE,
+func cube_up(p_position: Vector3 = Vector3.ZERO, p_size: Vector3 = Vector3.ONE,
         color: Color = default_color) -> void:
 
-    var basis := Basis.IDENTITY.scaled(size)
-    cube(position, basis, color)
+    var l_basis := Basis.IDENTITY.scaled(p_size)
+    cube(p_position, l_basis, color)
 
 
 ################################
 # SHORTCUTS - 2d drawing
 
-func _scale_basis(scale: float) -> Basis:
-    return Basis.IDENTITY.scaled(Vector3(scale, scale, scale))
+func _scale_basis(p_scale: float) -> Basis:
+    return Basis.IDENTITY.scaled(Vector3(p_scale, p_scale, p_scale))
 
 
 ## Shortcut function to draw a circle lying on the XZ plane.

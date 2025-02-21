@@ -5,7 +5,7 @@ namespace OsmTool;
 
 public class OsmReader : IReader
 {
-    public string Uri { get; set; }
+    public required string Uri { get; init; }
 
     public IEnumerable<OsmNode> IterateNodes()
     {
@@ -158,7 +158,7 @@ public class OsmReader : IReader
                 var tagDict = new Dictionary<string, string>();
                 var members = new List<OsmRelationMember>();
 
-                var depth = reader.Depth;
+                //var depth = reader.Depth;
 
                 while (reader.NodeType != XmlNodeType.EndElement)// && reader.Depth != depth)
                 {
@@ -174,8 +174,11 @@ public class OsmReader : IReader
                     if (reader.NodeType == XmlNodeType.Element && reader.Name == "member")
                     {
                         string? nodeRef = reader.GetAttribute("ref");
-                        string role = reader.GetAttribute("role")!.ToLower();
-                        string type = reader.GetAttribute("type")!.ToLower();
+                        string? role = reader.GetAttribute("role")?.ToLower();
+                        string? type = reader.GetAttribute("type")?.ToLower();
+                        if (nodeRef == null || role == null || type == null) {
+                            continue;
+                        }
                         members.Add(new OsmRelationMember
                         {
                             Id = long.Parse(nodeRef),

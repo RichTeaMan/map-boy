@@ -6,7 +6,7 @@ namespace OsmTool;
 public class OsmPbfReader : IReader
 {
 
-    public string Uri { get; set; }
+    public required string Uri { get; init; }
 
     public IEnumerable<OsmNode> IterateNodes()
     {

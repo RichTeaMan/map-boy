@@ -4,6 +4,7 @@ public class Program
 {
     public static void Main(string[] args)
     {
+        var startTime = DateTimeOffset.Now;
         string datafile = "datasets/westminster.osm";
         if (args.Length > 0)
         {
@@ -46,6 +47,8 @@ public class Program
         
         Console.WriteLine("Saving multipolygon relations...");
         store.SaveAreas(reader);
-        Console.WriteLine("Complete");
+        var endTime = DateTimeOffset.Now;
+        var duration = endTime - startTime;
+        Console.WriteLine($"Complete in {duration.TotalMinutes} minutes.");
     }
 }

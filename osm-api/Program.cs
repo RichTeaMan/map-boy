@@ -34,7 +34,9 @@ public class Program
             {
                 tileIds = new[] { long.Parse(tileIdStr) };
             }
-            var areas = store.FetchAreas(null, tileIds).ToArray();
+            var areas = store.FetchAreas(null, tileIds)
+            //.Where(a => a.SuggestedColour != "white")
+            .ToArray();
             await httpContext.Response.WriteAsJsonAsync(areas);
         })
         .WithName("GetAreas");
@@ -49,7 +51,7 @@ public class Program
         app.MapGet("/tileIdRange/{lat1:double}/{lon1:double}/{lat2:double}/{lon2:double}", (double lat1, double lon1, double lat2, double lon2) =>
         {
             var tileService = new TileService();
-            return new { tiles = tileService.CalcTileIdsInRangeSpiral(lat1, lon1, lat2, lon2).ToArray() };
+            return new { tiles = tileService.CalcTileIdsInRangeSpiral(lat1, lon1, lat2, lon2).Reverse().ToArray() };
         })
         .WithName("GetTileIdRange");
 

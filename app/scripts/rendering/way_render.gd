@@ -28,17 +28,29 @@ static func fetch_material(colour: String):
                 material.albedo_color = Color.YELLOW
             "purple":
                 material.albedo_color = Color.PURPLE
+            "light-yellow":
+                material.albedo_color = Color.LIGHT_YELLOW
+            "turf-green":
+                material.albedo_color = Color.MEDIUM_SEA_GREEN
+            "light-purple":
+                material.albedo_color = Color.PLUM
+            "light-red":
+                material.albedo_color = Color.LIGHT_PINK
+            "dark-grey":
+                material.albedo_color = Color.SLATE_GRAY
+            "pale-yellow":
+                material.albedo_color = Color.HONEYDEW
         material_map[colour] = material
     return material
 
-static func create_mesh_from_polygon(polygon_points: Array[Vector2]):
+static func create_mesh_from_polygon(polygon_points: PackedVector2Array):
         
-    var relative_v := PackedVector2Array()
-    var r = polygon_points[0]
-    for v in polygon_points:
-        var new_v = v - r
-        relative_v.append(new_v)
-    var indices = Geometry2D.triangulate_polygon(relative_v)
+    #var relative_v := PackedVector2Array()
+    #var r = polygon_points[0]
+    #for v in polygon_points:
+    #    var new_v = v - r
+    #    relative_v.append(new_v)
+    var indices = Geometry2D.triangulate_polygon(polygon_points)
 
     if indices.is_empty():
         printerr("Error: Triangulation failed.")
@@ -48,7 +60,7 @@ static func create_mesh_from_polygon(polygon_points: Array[Vector2]):
     arrays.resize(Mesh.ARRAY_MAX)
 
     var vertices = PackedVector3Array()
-    for point in relative_v:
+    for point in polygon_points:
         vertices.append(Vector3(point.x, 0, point.y))
 
     arrays[Mesh.ARRAY_VERTEX] = vertices
@@ -59,7 +71,7 @@ static func create_mesh_from_polygon(polygon_points: Array[Vector2]):
 
     return mesh
 
-static func create_area_node(area, vertices: Array[Vector2]) -> MapAreaNode:
+static func create_area_node(area, position: Vector2, vertices: PackedVector2Array) -> MapAreaNode:
     if vertices.size() == 0:
         printerr("Area %s: %s, has no coordinates." % [area.id, area.name])
         return null
@@ -69,6 +81,8 @@ static func create_area_node(area, vertices: Array[Vector2]) -> MapAreaNode:
     var mesh = create_mesh_from_polygon(vertices)
     if mesh == null: # Handle the triangulation error
         return
+    
+    
 
     var mesh_instance = MeshInstance3D.new()
     mesh_instance.mesh = mesh
@@ -76,5 +90,22 @@ static func create_area_node(area, vertices: Array[Vector2]) -> MapAreaNode:
     var map_area_node = MapAreaNode.new()
     map_area_node.name = "area-%s" % area.id
     map_area_node.add_child(mesh_instance)
-    map_area_node.position = Vector3(vertices[0].x, 0.0, vertices[0].y)
+    map_area_node.position = Vector3(position.x, 0.0, position.y)
+    map_area_node.is_large = area.isLarge
+    if map_area_node.is_large:
+        var min_lat = 100_000_000
+        var max_lat = -100_000_000
+        var min_lon = 100_000_000
+        var max_lon = -100_000_000
+        for c in area.coordinates:
+            if c.lat > max_lat:
+                max_lat = c.lat
+            if c.lat < min_lat:
+                min_lat = c.lat
+            if c.lon > max_lon:
+                max_lon = c.lon
+            if c.lon < min_lon:
+                min_lon = c.lon
+        map_area_node.min_vert = Vector2(Global.coord_factor * min_lat, Global.coord_factor * min_lon)
+        map_area_node.max_vert = Vector2(Global.coord_factor * max_lat, Global.coord_factor * max_lon)
     return map_area_node

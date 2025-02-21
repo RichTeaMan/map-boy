@@ -1,10 +1,6 @@
-class_name MapAreaNode
-extends Node3D
+extends Node
 
-var is_large: bool = false
-
-var min_vert: Vector2 = Vector2()
-var max_vert: Vector2 = Vector2()
+var coord_factor = 17_720
 
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:

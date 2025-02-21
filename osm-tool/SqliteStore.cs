@@ -4,6 +4,7 @@ using OsmTool.Models;
 
 namespace OsmTool;
 
+
 public record Coord
 {
     public double Lat { get; set; }
@@ -45,7 +46,7 @@ public class Way
 
     public Dictionary<string, string> TagsToDict()
     {
-        return Tags.Split(';').Select(t => t.Split('=')).Where(t => t.Length == 2).ToDictionary(t => t[0], t => t[1]);
+        return DictUtils.StringToDict(Tags);
     }
 }
 
@@ -58,11 +59,13 @@ public class Area
     public DateTimeOffset? Timestamp { get; set; }
     public string? User { get; set; }
     public long? Uid { get; set; }
-    public List<Coord> Coordinates { get; set; }
+    public required List<Coord> Coordinates { get; set; }
     public string? Name { get; set; }
-    public string SuggestedColour { get; set; }
+    public required string SuggestedColour { get; set; }
     public long TileId { get; set; }
     public int Layer { get; set; }
+    public double Height { get; set; }
+    public bool IsLarge { get; set; }
 }
 
 public class SqliteStore
@@ -174,18 +177,19 @@ public class SqliteStore
         using var reader = command.ExecuteReader();
         while (reader.Read())
         {
-            result[reader.GetInt64(0)] = new OsmNode
+            var node = new OsmNode
             {
-                Id = reader.GetInt64(0),
-                Visible = reader.GetBoolean(1),
-                Version = reader.GetInt32(2),
-                ChangeSet = reader.GetInt64(3),
-                Timestamp = DateTimeOffset.Parse(reader.GetString(4)),
-                User = reader.GetString(5),
-                Uid = reader.GetInt64(6),
-                Lat = reader.GetDouble(7),
-                Lon = reader.GetDouble(8)
+                Id = reader.GetInt64("id"),
+                Visible = reader.GetBoolean("visible"),
+                Version = reader.GetInt32("version"),
+                ChangeSet = reader.GetInt64("change_set"),
+                Timestamp = DateTimeOffset.Parse(reader.GetString("timestamp")),
+                User = reader.GetString("user"),
+                Uid = reader.GetInt64("uid"),
+                Lat = reader.GetDouble("lat"),
+                Lon = reader.GetDouble("lon")
             };
+            result.Add(node.Id, node);
         }
         return result;
     }
@@ -240,6 +244,17 @@ public class SqliteStore
 
     private string calcSuggestedColour(Dictionary<string, string> tags)
     {
+        if (tags.TryGetValue("type", out string? areaType))
+        {
+            switch (areaType)
+            {
+                case "boundary": return "no-colour";
+            }
+        }
+        if (tags.ContainsKey("indoor"))
+        {
+            return "no-colour";
+        }
         if (tags.TryGetValue("highway", out string? highway))
         {
             switch (highway)
@@ -312,6 +327,9 @@ public class SqliteStore
                 case "sidewalk":
                 case "cycleway":
                     return "light-grey";
+                case "unclassified":
+                case "traffic_island":
+                    return "no-colour";
             }
         }
         if (tags.TryGetValue("waterway", out string? waterway))
@@ -345,7 +363,7 @@ public class SqliteStore
         {
             return "blue";
         }
-        if (tags.ContainsKey("building") || tags.ContainsKey("building:colour") || tags.ContainsKey("building:part"))
+        if (tags.ContainsKey("building") || tags.ContainsKey("building:colour") || tags.ContainsKey("building:part") || tags.ContainsKey("shop") || tags.ContainsKey("disused:shop"))
         {
             return "grey";
         }
@@ -357,9 +375,24 @@ public class SqliteStore
         {
             switch (landUse)
             {
+                case "farmland":
+                    return "pale-yellow";
                 case "grass":
                 case "recreation_ground":
                     return "green";
+                case "construction":
+                    return "grey";
+                case "retail":
+                    return "light-red";
+                case "railway":
+                case "industrial":
+                    return "light-purple";
+                case "military":
+                case "commercial":
+                case "residential":
+
+                default:
+                    return "light-grey"; //???
             }
         }
         if (tags.TryGetValue("natural", out string? natural))
@@ -374,6 +407,8 @@ public class SqliteStore
         {
             switch (leisure)
             {
+                case "ice_rink":
+                    return "grey";
                 case "park":
                 case "playground":
                 case "sports_centre":
@@ -385,22 +420,47 @@ public class SqliteStore
                 case "fitness_centre":
                 case "golf_course":
                 case "miniature_golf":
-                case "pitch":
                 case "recreation_ground":
-                case "sauna":
-                case "slipway":
-                case "marina":
                 case "nature_reserve":
                 case "garden":
                 case "common":
                 case "dog_park":
-                case "fishing":
                 case "horse_riding":
-                case "ice_rink":
                     return "green";
+                case "marina":
+                    return "blue";
+                case "slip_way":
+                    return "white";
+                case "pitch":
+                    return "turf-green";
             }
         }
-        return "white";
+        if (tags.TryGetValue("man_made", out string? manMade))
+        {
+            switch (manMade)
+            {
+                case "pier":
+                    return "white";
+                case "storage_tank":
+                    return "no-colour";
+                case "tower":
+                case "train_station":
+                    return "grey";
+            }
+        }
+        if (tags.TryGetValue("amenity", out string? amenity)) {
+            switch (amenity)
+            {
+                case "parking":
+                    return "light-grey";
+                case "school":
+                    return "light-yellow";
+                case "prison":
+                    return "dark-grey";
+            }
+        }
+
+        return "unknown";
     }
 
     private void SaveWayBatch(SqliteConnection connection, List<OsmWay> wayBatch)
@@ -420,10 +480,9 @@ public class SqliteStore
             bool closedLoop = way!.Tags!.GetValueOrDefault("area", null) == "yes"
                 || nodes[way.NodeReferences.First()].LocationEquals(nodes[way.NodeReferences.Last()])
                 && !way.Tags.ContainsKey("highway")
-                && !way.Tags.ContainsKey("barrier")
-                && !way.Tags.ContainsKey("waterway");
+                && !way.Tags.ContainsKey("barrier");
+                // ??? && !way.Tags.ContainsKey("waterway");
 
-            string tags = string.Join(";", way.Tags.Select(t => $"{t.Key}={t.Value}"));
             wayTotal++;
 
             using var insertWayCommand = connection.CreateCommand();
@@ -439,7 +498,7 @@ public class SqliteStore
             insertWayCommand.Parameters.AddWithValue("$user", way.User as object ?? DBNull.Value);
             insertWayCommand.Parameters.AddWithValue("$uid", way.Uid as object ?? DBNull.Value);
             insertWayCommand.Parameters.AddWithValue("$closed_loop", closedLoop);
-            insertWayCommand.Parameters.AddWithValue("$tags", tags);
+            insertWayCommand.Parameters.AddWithValue("$tags", DictUtils.DictToString(way.Tags));
             insertWayCommand.ExecuteNonQuery();
 
             foreach (var node in wayNodes.Select((e, i) => new { e.Id, ordinal = i }))
@@ -464,7 +523,7 @@ public class SqliteStore
         connection.Open();
 
         using var command = connection.CreateCommand();
-        command.CommandText = @"SELECT id, visible, version, change_set, timestamp, user, uid, closed_loop, tags FROM way";
+        command.CommandText = @"SELECT id, visible, version, change_set, timestamp, user, uid, area_parent_id, closed_loop, tags FROM way";
         var whereClauses = new List<string>();
         if (ids != null)
         {
@@ -495,6 +554,7 @@ public class SqliteStore
                 Timestamp = DateTimeOffset.Parse(reader.GetString("timestamp")),
                 User = reader.GetString("user"),
                 Uid = reader.GetInt64("uid"),
+                AreaParentId = reader.GetValue("area_parent_id") as long?,
                 ClosedLoop = reader.GetBoolean("closed_loop"),
                 Tags = reader.GetString("tags")
             };
@@ -521,7 +581,7 @@ public class SqliteStore
 
             wayNodeMaps[wayId].Add(new Tuple<long, int>(nodeId, ordinal));
         }
-        var nodeIds = wayNodeMaps.SelectMany(kv => kv.Value.Select(e => e.Item1)).ToArray();
+        var nodeIds = wayNodeMaps.SelectMany(kv => kv.Value.Select(e => e.Item1)).Distinct().ToArray();
         var nodes = FetchByIds(nodeIds);
 
         foreach (var wayId in wayIds)
@@ -534,6 +594,126 @@ public class SqliteStore
         connection.Close();
 
         return result;
+    }
+
+    private double calcHeight(Dictionary<string, string> tags)
+    {
+        /*
+        https://wiki.openstreetmap.org/wiki/Key:layer
+        For technical reasons renderers typically give the layer tag the least weight of all considerations when determining how to draw features.
+
+        A 2D renderer could establish a 3D model of features, filter them by relevance and visually compose the result according to 3D ordering and rendering priorities. layer=* does only affect the 3D model and should have no influence whatsoever on relevance filtering and rendering priorities (visibility).
+
+        The 3D modeling is mostly determined by the natural (common sense) vertical ordering of features in combination with layer and level tags approximately in this order:
+
+            natural/common sense ordering: (location=underground, tunnel) under (landcover, landuse, natural) under waterways under (highway, railway) under (man_made, building) under (bridge, location=overground, location=overhead)
+            layer tag value:
+                layer can only "overrule" the natural ordering of features within one particular group but not place for example a river or landuse above a bridge or an aerialway (exception: use in indoor mapping or with location tag)
+                layer tags on "natural features" are frequently completely ignored
+            level tag value: considered together with layer - layer models the gross placement of man made objects while level is for features within such objects.
+            */
+
+        // is underground
+        double height = 0.0;
+        if (tags.TryGetValue("location", out string? location))
+        {
+            switch (location)
+            {
+                case "underground":
+                    height = -10.0;
+                    break;
+                case "tunnel":
+                    height = -20.0;
+                    break;
+            }
+        }
+
+        if (tags.TryGetValue("landuse", out string? landUse))
+        {
+            switch (landUse)
+            {
+                default:
+                    height += 0.05;
+                    break;
+            }
+        }
+        if (tags.TryGetValue("natural", out string? natural))
+        {
+            switch (natural)
+            {
+                case "water":
+                    height += 0.1;
+                    break;
+                case "wood":
+                case "tree":
+                    height += 4;
+                    break;
+            }
+        }
+        if (tags.TryGetValue("man_made", out string? manMade))
+        {
+            switch (manMade)
+            {
+                case "tower":
+                    height += 10;
+                    break;
+            }
+        }
+        if (tags.TryGetValue("leisure", out string? leisure))
+        {
+            height += 0.10;
+        }
+        if (tags.ContainsKey("waterway") && tags.ContainsKey("water"))
+        {
+            height += 0.10;
+        }
+        if (tags.ContainsKey("building") || tags.ContainsKey("building:colour") || tags.ContainsKey("building:part"))
+        {
+            height += 4.5;
+        }
+        if (tags.ContainsKey("bridge:structure"))
+        {
+            height += 1.5;
+        }
+
+        if (tags.TryGetValue("min_height", out string? minHeightStr))
+        {
+            if (double.TryParse(minHeightStr, out double minHeight))
+            {
+                //height = minHeight;
+            }
+        }
+        else if (tags.TryGetValue("height", out string? heightStr))
+        {
+            if (double.TryParse(heightStr, out double heightValue))
+            {
+                //height = heightValue;
+            }
+        }
+        if (tags.TryGetValue("layer", out string? layer))
+        {
+            if (int.TryParse(layer, out int layerValue))
+            {
+                height += 0.01 * layerValue;
+            }
+        }
+
+        return height;
+    }
+
+    private bool calcIsLarge(IEnumerable<Coord> coords)
+    {
+
+        var minLat = coords.Min(c => c.Lat);
+        var maxLat = coords.Max(c => c.Lat);
+
+        var minLon = coords.Min(c => c.Lon);
+        var maxLon = coords.Max(c => c.Lon);
+
+        var latDiff = Math.Abs(maxLat - minLat);
+        var lonDiff = Math.Abs(maxLon - minLon);
+        double bigDiff = 0.05; // idk, this value might work?
+        return latDiff > bigDiff || lonDiff > bigDiff;
     }
 
     public void SaveAreas(IReader reader)
@@ -557,7 +737,9 @@ public class SqliteStore
             name TEXT NULL,
             suggested_colour TEXT NOT NULL,
             tile_id INTEGER NOT NULL,
-            layer INTEGER NOT NULL
+            layer INTEGER NOT NULL,
+            height REAL NOT NULL,
+            is_large INTEGER NOT NULL
         );
         CREATE INDEX idx_area_tile_id ON area (tile_id);
         ";
@@ -606,7 +788,6 @@ public class SqliteStore
                 SaveAreaBatch(connection, wayBatch);
             }
         }
-
     }
 
     private void SaveAreaBatch(SqliteConnection connection, List<OsmRelation> relationBatch)
@@ -641,14 +822,10 @@ public class SqliteStore
                 continue;
             }
             int closedLoops = outerWays.Count(w => w.ClosedLoop);
-            if (closedLoops > 0)
+            if (closedLoops > 0 && outerWays.Count() > 1)
             {
-                Console.WriteLine($"relation {relation.Id} features closed loops: {closedLoops}/{outerWays.Count()}");
-                if (outerWays.Count() > 1)
-                {
-                    Console.WriteLine("Skipping multipolygon with multiple closed loops...");
-                    continue;
-                }
+                Console.WriteLine($"Skipping multipolygon relation {relation.Id} with multiple closed loops...");
+                continue;
             }
             if (outerWaysWithNulls.Any(w => w == null))
             {
@@ -717,31 +894,42 @@ public class SqliteStore
                 orderedCoords.Add(orderedCoords.First());
             }
 
-            var coords = string.Join(";", orderedCoords.Select(id => $"{id.Lat},{id.Lon}"));
-            using var insertAreaCommand = connection.CreateCommand();
-            insertAreaCommand.CommandText = @"
-                    INSERT INTO area (source, visible, version, change_set, timestamp, user, uid, coords, name, suggested_colour, tile_id, layer)
-                        VALUES($source, $visible, $version, $change_set, $timestamp, $user, $uid, $coords, $name, $suggested_colour, $tile_id, $layer);
+            string suggestedColour = calcSuggestedColour(relation.Tags);
+            if (suggestedColour == "unknown")
+            {
+                Console.WriteLine($"Relation {relation.Id} has an unknown colour, skipping.");
+            }
+            else if (suggestedColour != "no-colour")
+            {
+                var coords = string.Join(";", orderedCoords.Select(id => $"{id.Lat},{id.Lon}"));
+                using var insertAreaCommand = connection.CreateCommand();
+                insertAreaCommand.CommandText = @"
+                    INSERT INTO area (source, visible, version, change_set, timestamp, user, uid, coords, name, suggested_colour, tile_id, layer, height, is_large)
+                        VALUES($source, $visible, $version, $change_set, $timestamp, $user, $uid, $coords, $name, $suggested_colour, $tile_id, $layer, $height, $is_large);
                     ";
-            insertAreaCommand.Parameters.AddWithValue("$source", $"relation-{relation.Id}");
-            insertAreaCommand.Parameters.AddWithValue("$visible", relation.Visible as object ?? DBNull.Value);
-            insertAreaCommand.Parameters.AddWithValue("$version", relation.Version as object ?? DBNull.Value);
-            insertAreaCommand.Parameters.AddWithValue("$change_set", relation.ChangeSet);
-            insertAreaCommand.Parameters.AddWithValue("$timestamp", relation.Timestamp?.ToString("yyyy-MM-ddTHH:mm:ssZ") as object ?? DBNull.Value);
-            insertAreaCommand.Parameters.AddWithValue("$user", relation.User as object ?? DBNull.Value);
-            insertAreaCommand.Parameters.AddWithValue("$uid", relation.Uid as object ?? DBNull.Value);
-            insertAreaCommand.Parameters.AddWithValue("$coords", coords);
-            insertAreaCommand.Parameters.AddWithValue("$name", relation.Tags.TryGetValue("name", out string? nameValue) ? nameValue : DBNull.Value);
-            insertAreaCommand.Parameters.AddWithValue("$suggested_colour", calcSuggestedColour(relation.Tags));
-            insertAreaCommand.Parameters.AddWithValue("$tile_id", tileService.CalcTileId(orderedCoords.Average(n => n.Lat), orderedCoords.Average(n => n.Lon)));
-            insertAreaCommand.Parameters.AddWithValue("$layer", relation.Tags.TryGetValue("layer", out string? layerValue) ? layerValue : 0);
-            insertAreaCommand.ExecuteNonQuery();
+                insertAreaCommand.Parameters.AddWithValue("$source", $"relation-{relation.Id}");
+                insertAreaCommand.Parameters.AddWithValue("$visible", relation.Visible as object ?? DBNull.Value);
+                insertAreaCommand.Parameters.AddWithValue("$version", relation.Version as object ?? DBNull.Value);
+                insertAreaCommand.Parameters.AddWithValue("$change_set", relation.ChangeSet);
+                insertAreaCommand.Parameters.AddWithValue("$timestamp", relation.Timestamp?.ToString("yyyy-MM-ddTHH:mm:ssZ") as object ?? DBNull.Value);
+                insertAreaCommand.Parameters.AddWithValue("$user", relation.User as object ?? DBNull.Value);
+                insertAreaCommand.Parameters.AddWithValue("$uid", relation.Uid as object ?? DBNull.Value);
+                insertAreaCommand.Parameters.AddWithValue("$coords", coords);
+                insertAreaCommand.Parameters.AddWithValue("$name", relation.Tags.TryGetValue("name", out string? nameValue) ? nameValue : DBNull.Value);
+                insertAreaCommand.Parameters.AddWithValue("$suggested_colour", suggestedColour);
+                insertAreaCommand.Parameters.AddWithValue("$tile_id", tileService.CalcTileId(orderedCoords.Average(n => n.Lat), orderedCoords.Average(n => n.Lon)));
+                insertAreaCommand.Parameters.AddWithValue("$layer", relation.Tags.TryGetValue("layer", out string? layerValue) ? layerValue : 0);
+                insertAreaCommand.Parameters.AddWithValue("$height", calcHeight(relation.Tags));
+                insertAreaCommand.Parameters.AddWithValue("$is_large", calcIsLarge(orderedCoords));
+                insertAreaCommand.ExecuteNonQuery();
+            }
 
+            var parentedWayIds = relation.Members.Where(m => m.Type == "way").Select(m => m.Id);
             using var wayAreaParent = connection.CreateCommand();
             wayAreaParent.CommandText = @"
                     UPDATE way 
                     SET area_parent_id = $area_parent_id
-                    WHERE id IN($way_ids);".Replace("$way_ids", string.Join(',', outerWayIds));
+                    WHERE id IN($way_ids);".Replace("$way_ids", string.Join(',', parentedWayIds));
             wayAreaParent.Parameters.AddWithValue("$area_parent_id", relation.Id);
             wayAreaParent.ExecuteNonQuery();
         }
@@ -771,13 +959,23 @@ public class SqliteStore
                 Console.WriteLine($"Failed to find any coords for way {way.Id}");
                 continue;
             }
+            var wayTags = way.TagsToDict();
+
+            string suggestedColour = calcSuggestedColour(wayTags);
+            if (suggestedColour == "unknown")
+            {
+                Console.WriteLine($"Way {way.Id} has an unknown colour, skipping.");
+                continue;
+            }
+            else if (suggestedColour == "no-colour") {
+                continue;
+            }
 
             var coords = string.Join(";", orderedCoords.Select(id => $"{id.Lat},{id.Lon}"));
-            var wayTags = way.TagsToDict();
             using var insertAreaCommand = connection.CreateCommand();
             insertAreaCommand.CommandText = @"
-                    INSERT INTO area (source, visible, version, change_set, timestamp, user, uid, coords, name, suggested_colour, tile_id, layer)
-                        VALUES($source, $visible, $version, $change_set, $timestamp, $user, $uid, $coords, $name, $suggested_colour, $tile_id, $layer);
+                    INSERT INTO area (source, visible, version, change_set, timestamp, user, uid, coords, name, suggested_colour, tile_id, layer, height, is_large)
+                        VALUES($source, $visible, $version, $change_set, $timestamp, $user, $uid, $coords, $name, $suggested_colour, $tile_id, $layer, $height, $is_large);
                     ";
             insertAreaCommand.Parameters.AddWithValue("$source", $"way-{way.Id}");
             insertAreaCommand.Parameters.AddWithValue("$visible", way.Visible as object ?? DBNull.Value);
@@ -788,9 +986,11 @@ public class SqliteStore
             insertAreaCommand.Parameters.AddWithValue("$uid", way.Uid as object ?? DBNull.Value);
             insertAreaCommand.Parameters.AddWithValue("$coords", coords);
             insertAreaCommand.Parameters.AddWithValue("$name", wayTags.TryGetValue("name", out string? nameValue) ? nameValue : DBNull.Value);
-            insertAreaCommand.Parameters.AddWithValue("$suggested_colour", calcSuggestedColour(wayTags));
+            insertAreaCommand.Parameters.AddWithValue("$suggested_colour", suggestedColour);
             insertAreaCommand.Parameters.AddWithValue("$tile_id", tileService.CalcTileId(orderedCoords.Average(n => n.Lat), orderedCoords.Average(n => n.Lon)));
             insertAreaCommand.Parameters.AddWithValue("$layer", wayTags.TryGetValue("layer", out string? layerValue) ? layerValue : 0);
+            insertAreaCommand.Parameters.AddWithValue("$height", calcHeight(wayTags));
+            insertAreaCommand.Parameters.AddWithValue("$is_large", calcIsLarge(orderedCoords));
             insertAreaCommand.ExecuteNonQuery();
         }
         transaction.Commit();
@@ -802,7 +1002,7 @@ public class SqliteStore
         connection.Open();
 
         using var command = connection.CreateCommand();
-        command.CommandText = @"SELECT id, visible, version, change_set, timestamp, user, uid, coords, name, suggested_colour, tile_id, layer FROM area";
+        command.CommandText = @"SELECT id, visible, version, change_set, timestamp, user, uid, coords, name, suggested_colour, tile_id, layer, height, is_large FROM area";
 
         var whereClauses = new List<string>();
 
@@ -844,6 +1044,8 @@ public class SqliteStore
                 SuggestedColour = reader.GetString("suggested_colour"),
                 TileId = reader.GetInt64("tile_id"),
                 Layer = reader.GetInt32("layer"),
+                Height = reader.GetDouble("height"),
+                IsLarge = reader.GetBoolean("is_large"),
             };
         }
     }

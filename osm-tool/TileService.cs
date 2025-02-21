@@ -8,6 +8,13 @@ public class Tile
     public double Lat { get; set; }
     public double Lon { get; set; }
 }
+
+public class LargeTileRangeResult
+{
+    public required IEnumerable<Tile> Tiles { get; init; }
+
+    public bool IsLarge { get; init; }
+}
 public class TileService
 {
 
@@ -57,6 +64,25 @@ public class TileService
                 yield return new Tile { Id = tile, Lat = (row / (double)LAT_DEGREE_DIVISION) - 180.0, Lon = (col / (double)LON_DEGREE_DIVISION) - 180.0 };
             }
         }
+    }
+
+    public LargeTileRangeResult CalcLargeTileRange(IEnumerable<Coord> coords)
+    {
+        var minLat = coords.Min(c => c.Lat);
+        var maxLat = coords.Max(c => c.Lat);
+
+        var minLon = coords.Min(c => c.Lon);
+        var maxLon = coords.Max(c => c.Lon);
+
+        var latDiff = Math.Abs(maxLat - minLat);
+        var lonDiff = Math.Abs(maxLon - minLon);
+        double bigDiff = 0.05; // idk, this value might work?
+        bool isLarge = latDiff > bigDiff || lonDiff > bigDiff;
+        var tiles = new List<Tile>();
+        if (isLarge) {
+            tiles = CalcTileIdsInRange(minLat, minLon, maxLat, maxLon).ToList();
+        }
+        return new LargeTileRangeResult { Tiles = tiles, IsLarge = isLarge };
     }
 
     public IEnumerable<Tile> CalcTileIdsInRangeSpiral(double lat1, double lon1, double lat2, double lon2)

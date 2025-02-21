@@ -40,8 +40,8 @@ public class OsmWay : OsmBase
 public class OsmRelationMember
 {
     public long Id { get; init; }
-    public string Role { get; init; }
-    public string Type { get; init; }
+    public required string Role { get; init; }
+    public required string Type { get; init; }
 }
 
 public class OsmRelation : OsmBase

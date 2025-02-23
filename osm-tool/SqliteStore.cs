@@ -448,7 +448,8 @@ public class SqliteStore
                     return "grey";
             }
         }
-        if (tags.TryGetValue("amenity", out string? amenity)) {
+        if (tags.TryGetValue("amenity", out string? amenity))
+        {
             switch (amenity)
             {
                 case "parking":
@@ -481,7 +482,7 @@ public class SqliteStore
                 || nodes[way.NodeReferences.First()].LocationEquals(nodes[way.NodeReferences.Last()])
                 && !way.Tags.ContainsKey("highway")
                 && !way.Tags.ContainsKey("barrier");
-                // ??? && !way.Tags.ContainsKey("waterway");
+            // ??? && !way.Tags.ContainsKey("waterway");
 
             wayTotal++;
 
@@ -701,21 +702,6 @@ public class SqliteStore
         return height;
     }
 
-    private bool calcIsLarge(IEnumerable<Coord> coords)
-    {
-
-        var minLat = coords.Min(c => c.Lat);
-        var maxLat = coords.Max(c => c.Lat);
-
-        var minLon = coords.Min(c => c.Lon);
-        var maxLon = coords.Max(c => c.Lon);
-
-        var latDiff = Math.Abs(maxLat - minLat);
-        var lonDiff = Math.Abs(maxLon - minLon);
-        double bigDiff = 0.05; // idk, this value might work?
-        return latDiff > bigDiff || lonDiff > bigDiff;
-    }
-
     public void SaveAreas(IReader reader)
     {
         using (var connection = createConnection())
@@ -725,23 +711,30 @@ public class SqliteStore
             using var createTableCommand = connection.CreateCommand();
             createTableCommand.CommandText = @"
             CREATE TABLE IF NOT EXISTS area (
-            id INTEGER PRIMARY KEY,
-            source TEXT NOT NULL,
-            visible INTEGER NULL,
-            version INTEGER NULL,
-            change_set INTEGER NULL,
-            timestamp TEXT NULL,
-            user TEXT NOT NULL,
-            uid INTEGER NULL,
-            coords TEXT NOT NULL,
-            name TEXT NULL,
-            suggested_colour TEXT NOT NULL,
-            tile_id INTEGER NOT NULL,
-            layer INTEGER NOT NULL,
-            height REAL NOT NULL,
-            is_large INTEGER NOT NULL
-        );
-        CREATE INDEX idx_area_tile_id ON area (tile_id);
+                id INTEGER PRIMARY KEY,
+                source TEXT NOT NULL,
+                visible INTEGER NULL,
+                version INTEGER NULL,
+                change_set INTEGER NULL,
+                timestamp TEXT NULL,
+                user TEXT NOT NULL,
+                uid INTEGER NULL,
+                coords TEXT NOT NULL,
+                name TEXT NULL,
+                suggested_colour TEXT NOT NULL,
+                tile_id INTEGER NOT NULL,
+                layer INTEGER NOT NULL,
+                height REAL NOT NULL,
+                is_large INTEGER NOT NULL
+            );
+            CREATE INDEX idx_area_tile_id ON area (tile_id);
+
+            CREATE TABLE IF NOT EXISTS tile_area_map (
+                area_id INTEGER NOT NULL,
+                tile_id INTEGER NOT NULL
+            );
+            CREATE INDEX idx_tile_area_map_area_id ON tile_area_map (area_id);
+            CREATE INDEX idx_tile_area_map_tile_id ON tile_area_map (tile_id);
         ";
 
             createTableCommand.ExecuteNonQuery();
@@ -901,11 +894,15 @@ public class SqliteStore
             }
             else if (suggestedColour != "no-colour")
             {
+
+                var largeTileResult = tileService.CalcLargeTileRange(orderedCoords);
+
                 var coords = string.Join(";", orderedCoords.Select(id => $"{id.Lat},{id.Lon}"));
                 using var insertAreaCommand = connection.CreateCommand();
                 insertAreaCommand.CommandText = @"
                     INSERT INTO area (source, visible, version, change_set, timestamp, user, uid, coords, name, suggested_colour, tile_id, layer, height, is_large)
-                        VALUES($source, $visible, $version, $change_set, $timestamp, $user, $uid, $coords, $name, $suggested_colour, $tile_id, $layer, $height, $is_large);
+                        VALUES($source, $visible, $version, $change_set, $timestamp, $user, $uid, $coords, $name, $suggested_colour, $tile_id, $layer, $height, $is_large)
+                        RETURNING id;
                     ";
                 insertAreaCommand.Parameters.AddWithValue("$source", $"relation-{relation.Id}");
                 insertAreaCommand.Parameters.AddWithValue("$visible", relation.Visible as object ?? DBNull.Value);
@@ -920,7 +917,21 @@ public class SqliteStore
                 insertAreaCommand.Parameters.AddWithValue("$tile_id", tileService.CalcTileId(orderedCoords.Average(n => n.Lat), orderedCoords.Average(n => n.Lon)));
                 insertAreaCommand.Parameters.AddWithValue("$layer", relation.Tags.TryGetValue("layer", out string? layerValue) ? layerValue : 0);
                 insertAreaCommand.Parameters.AddWithValue("$height", calcHeight(relation.Tags));
-                insertAreaCommand.Parameters.AddWithValue("$is_large", calcIsLarge(orderedCoords));
+                insertAreaCommand.Parameters.AddWithValue("$is_large", largeTileResult.IsLarge);
+
+                if (largeTileResult.IsLarge)
+                {
+                    insertAreaCommand.CommandText += @"
+
+                    CREATE TEMP TABLE temp_id (id INTEGER);
+                    INSERT INTO temp_id (id) VALUES (last_insert_rowid());
+
+                    $values 
+                    DROP TABLE temp_id;
+                    "
+                    // because sqlite has the dumbest rules about SQL variables
+                    .Replace("$values", String.Join("\n", largeTileResult.Tiles.Select(t => $"INSERT INTO tile_area_map(area_id, tile_id) SELECT id, {t.Id} FROM temp_id;")));
+                }
                 insertAreaCommand.ExecuteNonQuery();
             }
 
@@ -967,9 +978,12 @@ public class SqliteStore
                 Console.WriteLine($"Way {way.Id} has an unknown colour, skipping.");
                 continue;
             }
-            else if (suggestedColour == "no-colour") {
+            else if (suggestedColour == "no-colour")
+            {
                 continue;
             }
+
+            var largeTileResult = tileService.CalcLargeTileRange(orderedCoords);
 
             var coords = string.Join(";", orderedCoords.Select(id => $"{id.Lat},{id.Lon}"));
             using var insertAreaCommand = connection.CreateCommand();
@@ -990,7 +1004,21 @@ public class SqliteStore
             insertAreaCommand.Parameters.AddWithValue("$tile_id", tileService.CalcTileId(orderedCoords.Average(n => n.Lat), orderedCoords.Average(n => n.Lon)));
             insertAreaCommand.Parameters.AddWithValue("$layer", wayTags.TryGetValue("layer", out string? layerValue) ? layerValue : 0);
             insertAreaCommand.Parameters.AddWithValue("$height", calcHeight(wayTags));
-            insertAreaCommand.Parameters.AddWithValue("$is_large", calcIsLarge(orderedCoords));
+            insertAreaCommand.Parameters.AddWithValue("$is_large", largeTileResult.IsLarge);
+
+            if (largeTileResult.IsLarge)
+            {
+                insertAreaCommand.CommandText += @"
+
+                CREATE TEMP TABLE temp_id (id INTEGER);
+                INSERT INTO temp_id (id) VALUES (last_insert_rowid());
+
+                $values 
+                DROP TABLE temp_id;
+                "
+                // because sqlite has the dumbest rules about SQL variables
+                .Replace("$values", String.Join("\n", largeTileResult.Tiles.Select(t => $"INSERT INTO tile_area_map(area_id, tile_id) SELECT id, {t.Id} FROM temp_id;")));
+            }
             insertAreaCommand.ExecuteNonQuery();
         }
         transaction.Commit();
@@ -1047,6 +1075,24 @@ public class SqliteStore
                 Height = reader.GetDouble("height"),
                 IsLarge = reader.GetBoolean("is_large"),
             };
+        }
+    }
+
+    
+
+    public IEnumerable<long> FetchAreaIdsByTileIds(long[] tileIds)
+    {
+        using var connection = createConnection();
+        connection.Open();
+
+        using var command = connection.CreateCommand();
+        command.CommandText = @"SELECT area_id FROM tile_area_map WHERE tile_id IN ($tile_ids);".Replace("$tile_ids", string.Join(",", tileIds));
+
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            var areaId = reader.GetInt64(0);
+            yield return areaId;
         }
     }
 }

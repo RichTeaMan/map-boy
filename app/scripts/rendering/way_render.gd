@@ -90,6 +90,7 @@ static func create_area_node(area, position: Vector2, vertices: PackedVector2Arr
     var map_area_node = MapAreaNode.new()
     map_area_node.name = "area-%s" % area.id
     map_area_node.add_child(mesh_instance)
+    map_area_node.area_id = area.id
     map_area_node.position = Vector3(position.x, 0.0, position.y)
     map_area_node.is_large = area.isLarge
     if map_area_node.is_large:

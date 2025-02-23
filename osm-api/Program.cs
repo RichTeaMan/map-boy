@@ -35,11 +35,31 @@ public class Program
                 tileIds = new[] { long.Parse(tileIdStr) };
             }
             var areas = store.FetchAreas(null, tileIds)
-            //.Where(a => a.SuggestedColour != "white")
-            .ToArray();
-            await httpContext.Response.WriteAsJsonAsync(areas);
+                //.Where(a => a.SuggestedColour != "white")
+                .Where(a => !a.IsLarge)
+                .ToArray();
+            var areaTileIds = store.FetchAreaIdsByTileIds(tileIds).ToArray();
+            var container = new AreaContainer
+            {
+                Areas = areas,
+                LargeAreaIds = areaTileIds
+            };
+            await httpContext.Response.WriteAsJsonAsync(container);
         })
         .WithName("GetAreas");
+
+        app.MapGet("/areasByIds", async (httpContext) =>
+        {
+            var store = createSqliteStore();
+            long[]? areaIds = null;
+            if (httpContext.Request.Query.TryGetValue("ids", out var idsStr))
+            {
+                areaIds = idsStr.Select(id => long.Parse(id)).ToArray();
+            }
+            var areas = store.FetchAreas(areaIds).ToArray();
+            await httpContext.Response.WriteAsJsonAsync(areas);
+        })
+        .WithName("GetAreaByIds");
 
         app.MapGet("/tileId/{lat:double}/{lon:double}", (double lat, double lon) =>
         {

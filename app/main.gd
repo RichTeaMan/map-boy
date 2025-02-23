@@ -3,15 +3,17 @@ extends Node3D
 const layer_factor = 0.1
 
 var loaded_tiles = {}
+var loaded_large_area_ids = {}
 
 var area_queue = []
+var large_area_queue = []
 var area_pending = false
 var tiles_pending = false
 var last_pos_lat = null
 var last_pos_long = null
 var last_purge_index = 0
 ## Maximum number of entities to check for purging in a single tick
-var purge_amount = 500
+var purge_amount = 50000
 
 var load_window = 0.02
 
@@ -25,13 +27,15 @@ func _ready():
     
     #$Camera3D.look_at(Vector3(avg_lat, 0.0, avg_lon), Vector3(0,1,0))
     
+    $areaHttpRequestPool.request_completed.connect(_on_areas_http_request_request_completed)
+    $largeAreaHttpRequestPool.request_completed.connect(_on_large_areas_http_request_request_completed)
     $areasHttpRequest.request_completed.connect(_on_areas_http_request_request_completed)
     $tilesIdRangeHttpRequest.request_completed.connect(_on_tiles_http_request_request_completed)
 
 func _process(delta: float):
     
     # load map
-    if !area_pending && area_queue.size() > 0:
+    if false && !area_pending && area_queue.size() > 0:
         var tile_info = area_queue.pop_front()
         while(tile_info != null):
             if loaded_tiles.has(tile_info.tile_id):
@@ -47,6 +51,28 @@ func _process(delta: float):
             $tile_markers.add_child(tile_marker)
             loaded_tiles[tile_info.tile_id] = true
             break
+    
+    while area_queue.size() > 0 && $areaHttpRequestPool.is_ready():
+        var tile_info = area_queue.pop_front()
+        if loaded_tiles.has(tile_info.tile_id):
+            continue
+        #print("Requesting area for tile %s." % tile_id)
+        $areaHttpRequestPool.request_now("http://127.0.0.1:5291/areas?tileId=%s" % tile_info.tile_id)
+        var tile_marker = TileMarkerNode.new()
+        tile_marker.tile_id = tile_info.tile_id
+        tile_marker.position = tile_info.tile_position
+        tile_marker.name = "tile-%s" % tile_info.tile_id
+        $tile_markers.add_child(tile_marker)
+        loaded_tiles[tile_info.tile_id] = true
+    
+    while large_area_queue.size() > 0 && $largeAreaHttpRequestPool.is_ready():
+        var large_area_id = large_area_queue.pop_front()
+        if loaded_large_area_ids.has(large_area_id):
+            continue
+        #print("Requesting area for tile %s." % tile_id)
+        $largeAreaHttpRequestPool.request_now("http://127.0.0.1:5291/areasByIds?ids=%s" % large_area_id)
+        var tile_marker = TileMarkerNode.new()
+        loaded_large_area_ids[large_area_id] = true
     
     # purge map
     purge_map_area_nodes()
@@ -113,7 +139,8 @@ func purge_map_area_nodes():
         var map_area_node = map_area_nodes[i]
         if map_area_node.is_large:
             if map_area_node.max_vert.x < lat1 || map_area_node.min_vert.x > lat2 || map_area_node.max_vert.y < lon1 || map_area_node.min_vert.y > lon2:
-                    map_area_node.queue_free()
+                loaded_large_area_ids.erase(map_area_node.area_id)
+                map_area_node.queue_free()
         elif map_area_node.position.x < lat1 || map_area_node.position.x > lat2 || map_area_node.position.z < lon1 || map_area_node.position.z > lon2:
             map_area_node.queue_free()
         i += 1
@@ -129,37 +156,66 @@ func purge_map_area_nodes():
 
 func _on_areas_http_request_request_completed(_result, _response_code, _headers, body):
     #print("area response...")
-    var areas = JSON.parse_string(body.get_string_from_utf8())
-    if areas != null:
-        for area in areas:
-            #if area.suggestedColour == "white" && area.layer >= 0:
-            #    print("Area is white: %s" % area.id)
-            #    continue
-            var vector_2d_list := PackedVector2Array()
-            var r = Vector2(area.coordinates[0].lat * Global.coord_factor, area.coordinates[0].lon * Global.coord_factor)
-            for c in area.coordinates:
-                var coord_vector = Vector2(c.lat * Global.coord_factor, c.lon * Global.coord_factor)
-                vector_2d_list.append(coord_vector - r)
-            var area_node = WayRender.create_area_node(area, r, vector_2d_list)
-            if area_node != null:
-                $map.add_child(area_node)
-                #if area.suggestedColour == "red" || area.suggestedColour == "dark-green" || area.suggestedColour == "grey" || area.suggestedColour == "light-grey":
-                #    area_node.position.y += 0.05
-                area_node.position.y = area.height
+    var area_response = JSON.parse_string(body.get_string_from_utf8())
+    var areas = area_response.areas
+    var large_area_ids = area_response.largeAreaIds
+    for large_area_id in large_area_ids:
+        if !loaded_large_area_ids.has(large_area_id):
+            large_area_queue.append(large_area_id)
+    create_areas(areas)
 
     #print("area response processed")
     area_pending = false
 
+func _on_large_areas_http_request_request_completed(_result, _response_code, _headers, body):
+    var areas = JSON.parse_string(body.get_string_from_utf8())
+    create_areas(areas)
+
+func create_areas(areas):
+    if areas == null:
+        return
+    for area in areas:
+        #if area.suggestedColour == "white" && area.layer >= 0:
+        #    print("Area is white: %s" % area.id)
+        #    continue
+        var vector_2d_list := PackedVector2Array()
+        var r = Vector2(area.coordinates[0].lat * Global.coord_factor, area.coordinates[0].lon * Global.coord_factor)
+        for c in area.coordinates:
+            var coord_vector = Vector2(c.lat * Global.coord_factor, c.lon * Global.coord_factor)
+            vector_2d_list.append(coord_vector - r)
+        var area_node = WayRender.create_area_node(area, r, vector_2d_list)
+        if area_node != null:
+            $map.add_child(area_node)
+            #if area.suggestedColour == "red" || area.suggestedColour == "dark-green" || area.suggestedColour == "grey" || area.suggestedColour == "light-grey":
+            #    area_node.position.y += 0.05
+            area_node.position.y = area.height
+
 func _on_tiles_http_request_request_completed(_result, _response_code, _headers, body):
     #print("tile response...")
     area_queue.clear()
+    $areaHttpRequestPool.clear_queue()
     var tileResponse = JSON.parse_string(body.get_string_from_utf8())
     for tile in tileResponse.tiles:
         var tile_id: int = tile.id
         if loaded_tiles.has(tile_id):
             continue
         var tile_info = { tile_id = tile_id, tile_position = Vector3(tile.lat * Global.coord_factor, 0.0, tile.lon * Global.coord_factor)}
+        
+        var tile_markers = $tile_markers
+        var callback_fn = func():
+            if loaded_tiles.has(tile_info.tile_id):
+                return false
+            var tile_marker = TileMarkerNode.new()
+            tile_marker.tile_id = tile_info.tile_id
+            tile_marker.position = tile_info.tile_position
+            tile_marker.name = "tile-%s" % tile_info.tile_id
+            tile_markers.add_child(tile_marker)
+            loaded_tiles[tile_info.tile_id] = true
+            return true
+        
         area_queue.push_front(tile_info)
+        #$areaHttpRequestPool.submit_front("http://127.0.0.1:5291/areas?tileId=%s" % tile_info.tile_id, callback_fn)
+        
 
     #print("tile response processed")
     tiles_pending = false

@@ -76,7 +76,7 @@ public class TileService
 
         var latDiff = Math.Abs(maxLat - minLat);
         var lonDiff = Math.Abs(maxLon - minLon);
-        double bigDiff = 0.05; // idk, this value might work?
+        double bigDiff = 0.01; // idk, this value might work?
         bool isLarge = latDiff > bigDiff || lonDiff > bigDiff;
         var tiles = new List<Tile>();
         if (isLarge) {

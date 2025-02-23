@@ -1,6 +1,8 @@
 class_name MapAreaNode
 extends Node3D
 
+var area_id: int
+
 var is_large: bool = false
 
 var min_vert: Vector2 = Vector2()

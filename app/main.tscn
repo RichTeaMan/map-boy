@@ -1,12 +1,18 @@
-[gd_scene load_steps=5 format=3 uid="uid://dnot2k6d5atay"]
+[gd_scene load_steps=7 format=3 uid="uid://dnot2k6d5atay"]
 
 [ext_resource type="Script" path="res://main.gd" id="1_4rdyb"]
 [ext_resource type="PackedScene" uid="uid://ca587oe3rcyf5" path="res://marker.tscn" id="2_8qnr4"]
 [ext_resource type="Script" path="res://custom_nodes/http_request_pool.gd" id="2_xvfvq"]
 
+[sub_resource type="PhysicalSkyMaterial" id="PhysicalSkyMaterial_3s87r"]
+
+[sub_resource type="Sky" id="Sky_dlah8"]
+sky_material = SubResource("PhysicalSkyMaterial_3s87r")
+
 [sub_resource type="Environment" id="Environment_7ihdo"]
 background_mode = 2
 background_energy_multiplier = 7.91
+sky = SubResource("Sky_dlah8")
 ambient_light_color = Color(0.907942, 0.907942, 0.907942, 1)
 ambient_light_energy = 7.65
 
@@ -33,11 +39,22 @@ use_threads = true
 
 [node name="tile_markers" type="Node3D" parent="."]
 
-[node name="Camera3D" type="Camera3D" parent="."]
-transform = Transform3D(-4.37114e-08, 1, 4.37114e-08, 0, -4.37114e-08, 1, 1, 4.37114e-08, 1.91069e-15, 0, 10, 0)
-current = true
-
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
 environment = SubResource("Environment_7ihdo")
 
 [node name="Marker" parent="." instance=ExtResource("2_8qnr4")]
+
+[node name="cameras" type="Node3D" parent="."]
+unique_name_in_owner = true
+
+[node name="street_camera" type="Camera3D" parent="cameras"]
+unique_name_in_owner = true
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.8, 0)
+
+[node name="satellite_camera" type="Camera3D" parent="cameras"]
+unique_name_in_owner = true
+transform = Transform3D(-4.37114e-08, 1, 4.37114e-08, 0, -4.37114e-08, 1, 1, 4.37114e-08, 1.91069e-15, 0, 10, 0)
+current = true
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.136494, 0.990641, 0, -0.990641, 0.136494, 0, 0, 0)

@@ -21,9 +21,9 @@ func _ready():
     
     var avg_lat = 51.4995145764631 * Global.coord_factor
     var avg_lon = -0.126637687351658 * Global.coord_factor
-    $Camera3D.position.x = avg_lat
-    $Camera3D.position.y = 10.0
-    $Camera3D.position.z = avg_lon
+    %cameras.position.x = avg_lat
+    %satellite_camera.position.y = 10.0
+    %cameras.position.z = avg_lon
     
     #$Camera3D.look_at(Vector3(avg_lat, 0.0, avg_lon), Vector3(0,1,0))
     
@@ -78,21 +78,67 @@ func _process(delta: float):
     purge_map_area_nodes()
     
     # camera movement
-    
-    var zoom_factor := 30.0 * delta
-    var move_factor := 50.0 * delta
-    if Input.is_action_pressed("ui_up"):
-        $Camera3D.position.y -= zoom_factor
-    if Input.is_action_pressed("ui_down"):
-        $Camera3D.position.y += zoom_factor
-    if Input.is_action_pressed("left"):
-        $Camera3D.position.z -= move_factor
-    if Input.is_action_pressed("right"):
-        $Camera3D.position.z += move_factor
-    if Input.is_action_pressed("up"):
-        $Camera3D.position.x += move_factor
-    if Input.is_action_pressed("down"):
-        $Camera3D.position.x -= move_factor
+    if %street_camera.current:
+        var player = %street_camera.get_global_transform().basis
+        var forward = -player.z
+        var backward = player.z
+        var left = -player.x
+        var right = player.x
+        
+        var move_factor := 10.0 * delta
+        var rotate_factor := 1.0 * delta
+        if Input.is_action_pressed("rotate_left"):
+            %cameras.rotate_y(rotate_factor)
+        if Input.is_action_pressed("rotate_right"):
+            %cameras.rotate_y(-rotate_factor)
+        if Input.is_action_pressed("left"):
+            %cameras.position += left * move_factor
+        if Input.is_action_pressed("right"):
+            %cameras.position += right * move_factor
+        if Input.is_action_pressed("up"):
+            %cameras.position += forward * move_factor
+        if Input.is_action_pressed("down"):
+            %cameras.position += backward * move_factor
+    else:
+        var player = %satellite_camera.get_global_transform().basis
+        var forward = player.y
+        var backward = -player.y
+        var left = -player.x
+        var right = player.x
+        var zoom_factor := 30.0 * delta
+        var move_factor := 50.0 * delta
+        var rotate_factor := 2.5 * delta
+        if Input.is_action_pressed("rotate_left"):
+            %cameras.rotate_y(-rotate_factor)
+        if Input.is_action_pressed("rotate_right"):
+            %cameras.rotate_y(rotate_factor)
+        if Input.is_action_pressed("ui_up"):
+            %satellite_camera.position.y -= zoom_factor
+        if Input.is_action_pressed("ui_down"):
+            %satellite_camera.position.y += zoom_factor
+        if Input.is_action_pressed("left"):
+            %cameras.position += left * move_factor
+        if Input.is_action_pressed("right"):
+            %cameras.position += right * move_factor
+        if Input.is_action_pressed("up"):
+            %cameras.position += forward * move_factor
+        if Input.is_action_pressed("down"):
+            %cameras.position += backward * move_factor
+        
+    if Input.is_action_just_pressed("camera_change"):
+        var cameras = []
+        for cam in %cameras.get_children():
+            if cam is Camera3D:
+                cameras.append(cam)
+        var i = 0
+        var current_cam_id = 0
+        for cam in cameras:
+            if cam.current:
+                cam.current = false
+                break
+            i += 1
+        var next_cam_id = (i + 1) % cameras.size()
+        cameras[next_cam_id].current = true
     
     refresh_tile_queue()
 
@@ -102,8 +148,8 @@ func refresh_tile_queue():
     
     # search for tiles 0.1 degrees around camera postion, which is very roughly similar to 1.7km
     var deg_range = load_window
-    var current_lat = $Camera3D.position.x / Global.coord_factor
-    var current_lon = $Camera3D.position.z / Global.coord_factor
+    var current_lat = %cameras.position.x / Global.coord_factor
+    var current_lon = %cameras.position.z / Global.coord_factor
     
     if last_pos_lat == current_lat && last_pos_long == current_lon:
         return
@@ -122,8 +168,8 @@ func purge_map_area_nodes():
     
     # search for tiles 0.1 degrees around camera postion, which is very roughly similar to 1.7km
     var deg_range = load_window * Global.coord_factor * 2.0
-    var current_lat = $Camera3D.position.x
-    var current_lon = $Camera3D.position.z
+    var current_lat = %cameras.position.x
+    var current_lon = %cameras.position.z
     
     var lat1 = current_lat - deg_range
     var lon1 = current_lon - deg_range
@@ -175,9 +221,6 @@ func create_areas(areas):
     if areas == null:
         return
     for area in areas:
-        #if area.suggestedColour == "white" && area.layer >= 0:
-        #    print("Area is white: %s" % area.id)
-        #    continue
         var vector_2d_list := PackedVector2Array()
         var r = Vector2(area.coordinates[0].lat * Global.coord_factor, area.coordinates[0].lon * Global.coord_factor)
         for c in area.coordinates:
@@ -186,9 +229,6 @@ func create_areas(areas):
         var area_node = WayRender.create_area_node(area, r, vector_2d_list)
         if area_node != null:
             $map.add_child(area_node)
-            #if area.suggestedColour == "red" || area.suggestedColour == "dark-green" || area.suggestedColour == "grey" || area.suggestedColour == "light-grey":
-            #    area_node.position.y += 0.05
-            area_node.position.y = area.height
 
 func _on_tiles_http_request_request_completed(_result, _response_code, _headers, body):
     #print("tile response...")

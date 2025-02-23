@@ -172,9 +172,11 @@ static func create_area_node(area, position: Vector2, vertices: PackedVector2Arr
         printerr("Closed loop way must have at least 3 nodes.")
         return null;
     
+    var y_position = area.height
     var mesh: ArrayMesh
     if area.height > 0.5:
         mesh = create_3d_mesh_from_polygon(vertices, area.height)
+        y_position = 0.0
     else:
         mesh = create_2d_mesh_from_polygon(vertices)
     if mesh == null: # Handle the triangulation error
@@ -187,7 +189,7 @@ static func create_area_node(area, position: Vector2, vertices: PackedVector2Arr
     map_area_node.name = "area-%s" % area.id
     map_area_node.add_child(mesh_instance)
     map_area_node.area_id = area.id
-    map_area_node.position = Vector3(position.x, 0.0, position.y)
+    map_area_node.position = Vector3(position.x, y_position, position.y)
     map_area_node.is_large = area.isLarge
     if map_area_node.is_large:
         var min_lat = 100_000_000

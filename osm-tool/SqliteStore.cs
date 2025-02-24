@@ -1,4 +1,5 @@
 using System.Data;
+using System.Drawing;
 using Microsoft.Data.Sqlite;
 using OsmTool.Models;
 
@@ -65,12 +66,16 @@ public class Area
     public long TileId { get; set; }
     public int Layer { get; set; }
     public double Height { get; set; }
+
+    public double MinHeight { get; set; }
     public bool IsLarge { get; set; }
 }
 
 public class SqliteStore
 {
     private readonly TileService tileService = new TileService();
+
+    private readonly BuildingHeightService heightService = new BuildingHeightService();
 
     private string FilePath { get; init; }
 
@@ -244,6 +249,27 @@ public class SqliteStore
 
     private string calcSuggestedColour(Dictionary<string, string> tags)
     {
+        foreach (var (k, v) in tags)
+        {
+            if (k.Contains("note"))
+            {
+                Console.WriteLine($"'{k}' -> '{v}'");
+            }
+        }
+
+        if (tags.TryGetValue("building:colour", out string? buildingColour))
+        {
+            if (buildingColour.StartsWith("#"))
+            {
+                return buildingColour;
+            }
+            var knownColour = Color.FromName(buildingColour);
+            if (knownColour.ToArgb() != 0)
+            {
+                return "#" + knownColour.ToArgb().ToString("X6");
+            }
+            Console.WriteLine($"Irregular building:colour: {buildingColour}");
+        }
         if (tags.TryGetValue("type", out string? areaType))
         {
             switch (areaType)
@@ -362,6 +388,11 @@ public class SqliteStore
         if (tags.ContainsKey("water"))
         {
             return "blue";
+        }
+        if (tags.TryGetValue("building:part", out string? buildingPart)) {
+            if (buildingPart == "no") {
+                return "no-colour";
+            }
         }
         if (tags.ContainsKey("building") || tags.ContainsKey("building:colour") || tags.ContainsKey("building:part") || tags.ContainsKey("shop") || tags.ContainsKey("disused:shop"))
         {
@@ -597,111 +628,6 @@ public class SqliteStore
         return result;
     }
 
-    private double calcHeight(Dictionary<string, string> tags)
-    {
-        /*
-        https://wiki.openstreetmap.org/wiki/Key:layer
-        For technical reasons renderers typically give the layer tag the least weight of all considerations when determining how to draw features.
-
-        A 2D renderer could establish a 3D model of features, filter them by relevance and visually compose the result according to 3D ordering and rendering priorities. layer=* does only affect the 3D model and should have no influence whatsoever on relevance filtering and rendering priorities (visibility).
-
-        The 3D modeling is mostly determined by the natural (common sense) vertical ordering of features in combination with layer and level tags approximately in this order:
-
-            natural/common sense ordering: (location=underground, tunnel) under (landcover, landuse, natural) under waterways under (highway, railway) under (man_made, building) under (bridge, location=overground, location=overhead)
-            layer tag value:
-                layer can only "overrule" the natural ordering of features within one particular group but not place for example a river or landuse above a bridge or an aerialway (exception: use in indoor mapping or with location tag)
-                layer tags on "natural features" are frequently completely ignored
-            level tag value: considered together with layer - layer models the gross placement of man made objects while level is for features within such objects.
-            */
-
-        // is underground
-        double height = 0.0;
-        if (tags.TryGetValue("location", out string? location))
-        {
-            switch (location)
-            {
-                case "underground":
-                    height = -10.0;
-                    break;
-                case "tunnel":
-                    height = -20.0;
-                    break;
-            }
-        }
-
-        if (tags.TryGetValue("landuse", out string? landUse))
-        {
-            switch (landUse)
-            {
-                default:
-                    height += 0.05;
-                    break;
-            }
-        }
-        if (tags.TryGetValue("natural", out string? natural))
-        {
-            switch (natural)
-            {
-                case "water":
-                    height += 0.1;
-                    break;
-                case "wood":
-                case "tree":
-                    height += 4;
-                    break;
-            }
-        }
-        if (tags.TryGetValue("man_made", out string? manMade))
-        {
-            switch (manMade)
-            {
-                case "tower":
-                    height += 10;
-                    break;
-            }
-        }
-        if (tags.TryGetValue("leisure", out string? leisure))
-        {
-            height += 0.10;
-        }
-        if (tags.ContainsKey("waterway") && tags.ContainsKey("water"))
-        {
-            height += 0.10;
-        }
-        if (tags.ContainsKey("building") || tags.ContainsKey("building:colour") || tags.ContainsKey("building:part"))
-        {
-            height += 4.5;
-        }
-        if (tags.ContainsKey("bridge:structure"))
-        {
-            height += 1.5;
-        }
-
-        if (tags.TryGetValue("min_height", out string? minHeightStr))
-        {
-            if (double.TryParse(minHeightStr, out double minHeight))
-            {
-                //height = minHeight;
-            }
-        }
-        else if (tags.TryGetValue("height", out string? heightStr))
-        {
-            if (double.TryParse(heightStr, out double heightValue))
-            {
-                //height = heightValue;
-            }
-        }
-        if (tags.TryGetValue("layer", out string? layer))
-        {
-            if (int.TryParse(layer, out int layerValue))
-            {
-                height += 0.01 * layerValue;
-            }
-        }
-
-        return height;
-    }
-
     public void SaveAreas(IReader reader)
     {
         using (var connection = createConnection())
@@ -725,6 +651,7 @@ public class SqliteStore
                 tile_id INTEGER NOT NULL,
                 layer INTEGER NOT NULL,
                 height REAL NOT NULL,
+                min_height REAL NOT NULL,
                 is_large INTEGER NOT NULL
             );
             CREATE INDEX idx_area_tile_id ON area (tile_id);
@@ -896,12 +823,13 @@ public class SqliteStore
             {
 
                 var largeTileResult = tileService.CalcLargeTileRange(orderedCoords);
+                var heightResult = heightService.CalcBuildingHeight(relation.Tags);
 
                 var coords = string.Join(";", orderedCoords.Select(id => $"{id.Lat},{id.Lon}"));
                 using var insertAreaCommand = connection.CreateCommand();
                 insertAreaCommand.CommandText = @"
-                    INSERT INTO area (source, visible, version, change_set, timestamp, user, uid, coords, name, suggested_colour, tile_id, layer, height, is_large)
-                        VALUES($source, $visible, $version, $change_set, $timestamp, $user, $uid, $coords, $name, $suggested_colour, $tile_id, $layer, $height, $is_large)
+                    INSERT INTO area (source, visible, version, change_set, timestamp, user, uid, coords, name, suggested_colour, tile_id, layer, height, min_height, is_large)
+                        VALUES($source, $visible, $version, $change_set, $timestamp, $user, $uid, $coords, $name, $suggested_colour, $tile_id, $layer, $height, $min_height, $is_large)
                         RETURNING id;
                     ";
                 insertAreaCommand.Parameters.AddWithValue("$source", $"relation-{relation.Id}");
@@ -916,7 +844,8 @@ public class SqliteStore
                 insertAreaCommand.Parameters.AddWithValue("$suggested_colour", suggestedColour);
                 insertAreaCommand.Parameters.AddWithValue("$tile_id", tileService.CalcTileId(orderedCoords.Average(n => n.Lat), orderedCoords.Average(n => n.Lon)));
                 insertAreaCommand.Parameters.AddWithValue("$layer", relation.Tags.TryGetValue("layer", out string? layerValue) ? layerValue : 0);
-                insertAreaCommand.Parameters.AddWithValue("$height", calcHeight(relation.Tags));
+                insertAreaCommand.Parameters.AddWithValue("$height", heightResult.Height);
+                insertAreaCommand.Parameters.AddWithValue("$min_height", heightResult.MinHeight);
                 insertAreaCommand.Parameters.AddWithValue("$is_large", largeTileResult.IsLarge);
 
                 if (largeTileResult.IsLarge)
@@ -984,12 +913,13 @@ public class SqliteStore
             }
 
             var largeTileResult = tileService.CalcLargeTileRange(orderedCoords);
+            var heightResult = heightService.CalcBuildingHeight(wayTags);
 
             var coords = string.Join(";", orderedCoords.Select(id => $"{id.Lat},{id.Lon}"));
             using var insertAreaCommand = connection.CreateCommand();
             insertAreaCommand.CommandText = @"
-                    INSERT INTO area (source, visible, version, change_set, timestamp, user, uid, coords, name, suggested_colour, tile_id, layer, height, is_large)
-                        VALUES($source, $visible, $version, $change_set, $timestamp, $user, $uid, $coords, $name, $suggested_colour, $tile_id, $layer, $height, $is_large);
+                    INSERT INTO area (source, visible, version, change_set, timestamp, user, uid, coords, name, suggested_colour, tile_id, layer, height, min_height, is_large)
+                        VALUES($source, $visible, $version, $change_set, $timestamp, $user, $uid, $coords, $name, $suggested_colour, $tile_id, $layer, $height, $min_height, $is_large);
                     ";
             insertAreaCommand.Parameters.AddWithValue("$source", $"way-{way.Id}");
             insertAreaCommand.Parameters.AddWithValue("$visible", way.Visible as object ?? DBNull.Value);
@@ -1003,7 +933,8 @@ public class SqliteStore
             insertAreaCommand.Parameters.AddWithValue("$suggested_colour", suggestedColour);
             insertAreaCommand.Parameters.AddWithValue("$tile_id", tileService.CalcTileId(orderedCoords.Average(n => n.Lat), orderedCoords.Average(n => n.Lon)));
             insertAreaCommand.Parameters.AddWithValue("$layer", wayTags.TryGetValue("layer", out string? layerValue) ? layerValue : 0);
-            insertAreaCommand.Parameters.AddWithValue("$height", calcHeight(wayTags));
+            insertAreaCommand.Parameters.AddWithValue("$height", heightResult.Height);
+            insertAreaCommand.Parameters.AddWithValue("$min_height", heightResult.MinHeight);
             insertAreaCommand.Parameters.AddWithValue("$is_large", largeTileResult.IsLarge);
 
             if (largeTileResult.IsLarge)
@@ -1030,7 +961,7 @@ public class SqliteStore
         connection.Open();
 
         using var command = connection.CreateCommand();
-        command.CommandText = @"SELECT id, visible, version, change_set, timestamp, user, uid, coords, name, suggested_colour, tile_id, layer, height, is_large FROM area";
+        command.CommandText = @"SELECT id, visible, version, change_set, timestamp, user, uid, coords, name, suggested_colour, tile_id, layer, height, min_height, is_large FROM area";
 
         var whereClauses = new List<string>();
 
@@ -1073,12 +1004,11 @@ public class SqliteStore
                 TileId = reader.GetInt64("tile_id"),
                 Layer = reader.GetInt32("layer"),
                 Height = reader.GetDouble("height"),
+                MinHeight = reader.GetDouble("min_height"),
                 IsLarge = reader.GetBoolean("is_large"),
             };
         }
     }
-
-    
 
     public IEnumerable<long> FetchAreaIdsByTileIds(long[] tileIds)
     {

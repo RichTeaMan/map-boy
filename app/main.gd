@@ -31,6 +31,8 @@ func _ready():
     $largeAreaHttpRequestPool.request_completed.connect(_on_large_areas_http_request_request_completed)
     $areasHttpRequest.request_completed.connect(_on_areas_http_request_request_completed)
     $tilesIdRangeHttpRequest.request_completed.connect(_on_tiles_http_request_request_completed)
+    
+    Global.teleport.connect(_on_teleport)
 
 func _process(delta: float):
     
@@ -85,7 +87,7 @@ func _process(delta: float):
         var left = -player.x
         var right = player.x
         
-        var move_factor := 10.0 * delta
+        var move_factor := 25.0 * delta
         var rotate_factor := 1.0 * delta
         if Input.is_action_pressed("rotate_left"):
             %cameras.rotate_y(rotate_factor)
@@ -259,3 +261,7 @@ func _on_tiles_http_request_request_completed(_result, _response_code, _headers,
 
     #print("tile response processed")
     tiles_pending = false
+
+func _on_teleport(lat: float, lon: float):
+    %cameras.position.x = lat * Global.coord_factor
+    %cameras.position.z = lon * Global.coord_factor

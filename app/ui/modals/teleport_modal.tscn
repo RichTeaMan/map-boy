@@ -1,0 +1,37 @@
+[gd_scene load_steps=2 format=3 uid="uid://b0e4pvbt3at7d"]
+
+[ext_resource type="Script" path="res://ui/modals/teleport_modal.gd" id="1_xavld"]
+
+[node name="TeleportModal" type="Window"]
+title = "Teleport"
+position = Vector2i(500, 500)
+size = Vector2i(400, 200)
+script = ExtResource("1_xavld")
+
+[node name="MarginContainer" type="MarginContainer" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="MarginContainer"]
+layout_mode = 2
+
+[node name="input_teleport" type="LineEdit" parent="MarginContainer/VBoxContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="HBoxContainer" type="HBoxContainer" parent="MarginContainer/VBoxContainer"]
+custom_minimum_size = Vector2(4, 0)
+layout_mode = 2
+
+[node name="btn_teleport" type="Button" parent="MarginContainer/VBoxContainer/HBoxContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Teleport"
+
+[node name="btn_cancel" type="Button" parent="MarginContainer/VBoxContainer/HBoxContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Cancel"

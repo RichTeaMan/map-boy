@@ -2,14 +2,29 @@ class_name WayRender
 
 static var material_map = {}
 
+static func fetch_outline_material():
+    var shader_material = material_map.get("outline-mat")
+    if shader_material == null:
+        shader_material = ShaderMaterial.new()
+        var shader = load("res://shaders/outline.gdshader")
+        shader_material.shader = shader
+        material_map["outline-mat"] = shader_material
+    return shader_material
+
 static func fetch_material(colour: String):
     var material = material_map.get(colour)
     if material == null:
         material = StandardMaterial3D.new()
         material.vertex_color_use_as_albedo = true
         material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-        material.albedo_color = Color.YELLOW
-        match colour:
+        material.albedo_color = Color.BLACK
+        var cleaned_colour = colour
+        if colour.begins_with("polygon-"):
+            pass
+            cleaned_colour = colour.trim_prefix("polygon-")
+            material.next_pass = fetch_outline_material()
+        
+        match cleaned_colour:
             "red":
                 material.albedo_color = Color.ORANGE_RED
             "blue":
@@ -40,6 +55,8 @@ static func fetch_material(colour: String):
                 material.albedo_color = Color.SLATE_GRAY
             "pale-yellow":
                 material.albedo_color = Color.HONEYDEW
+            _:
+                material.albedo_color = Color.html(cleaned_colour)
         material_map[colour] = material
     return material
 
@@ -173,10 +190,12 @@ static func create_area_node(area, position: Vector2, vertices: PackedVector2Arr
         return null;
     
     var y_position = area.height
+    var area_colour = area.suggestedColour
     var mesh: ArrayMesh
     if area.height > 0.5:
-        mesh = create_3d_mesh_from_polygon(vertices, area.height)
-        y_position = 0.0
+        mesh = create_3d_mesh_from_polygon(vertices, area.height - area.minHeight)
+        y_position = area.minHeight
+        area_colour = "polygon-%s" % area_colour
     else:
         mesh = create_2d_mesh_from_polygon(vertices)
     if mesh == null: # Handle the triangulation error
@@ -184,7 +203,7 @@ static func create_area_node(area, position: Vector2, vertices: PackedVector2Arr
 
     var mesh_instance = MeshInstance3D.new()
     mesh_instance.mesh = mesh
-    mesh.surface_set_material(0, fetch_material(area.suggestedColour))
+    mesh.surface_set_material(0, fetch_material(area_colour))
     var map_area_node = MapAreaNode.new()
     map_area_node.name = "area-%s" % area.id
     map_area_node.add_child(mesh_instance)

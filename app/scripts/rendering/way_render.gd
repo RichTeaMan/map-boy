@@ -25,6 +25,8 @@ static func fetch_material(colour: String):
             material.next_pass = fetch_outline_material()
         
         match cleaned_colour:
+            "black":
+                material.albedo_color = Color.BLACK
             "red":
                 material.albedo_color = Color.ORANGE_RED
             "blue":
@@ -61,16 +63,13 @@ static func fetch_material(colour: String):
     return material
 
 static func create_2d_mesh_from_polygon(polygon_points: PackedVector2Array) -> ArrayMesh:
-        
-    #var relative_v := PackedVector2Array()
-    #var r = polygon_points[0]
-    #for v in polygon_points:
-    #    var new_v = v - r
-    #    relative_v.append(new_v)
+
     var indices = Geometry2D.triangulate_polygon(polygon_points)
 
     if indices.is_empty():
         printerr("Error: Triangulation failed.")
+        #for p in polygon_points:
+        #    print("%s, %s" % [p.x, p.y])
         return null
 
     var arrays = []
@@ -89,12 +88,7 @@ static func create_2d_mesh_from_polygon(polygon_points: PackedVector2Array) -> A
     return mesh
 
 static func create_3d_mesh_from_polygon(polygon_points: PackedVector2Array, height: float) -> ArrayMesh:
-        
-    #var relative_v := PackedVector2Array()
-    #var r = polygon_points[0]
-    #for v in polygon_points:
-    #    var new_v = v - r
-    #    relative_v.append(new_v)
+
     var indices = Geometry2D.triangulate_polygon(polygon_points)
 
     if indices.is_empty():
@@ -104,10 +98,6 @@ static func create_3d_mesh_from_polygon(polygon_points: PackedVector2Array, heig
     var arrays = []
     arrays.resize(Mesh.ARRAY_MAX)
 
-    #var vertices = PackedVector3Array()
-    #for point in polygon_points:
-    #    vertices.append(Vector3(point.x, 0, point.y))
-
     return _generate_extruded_mesh(polygon_points, indices, height)
 
 static func _generate_extruded_mesh(points: PackedVector2Array, triangle_indices: PackedInt32Array, extrusion_height: float) -> ArrayMesh:
@@ -115,66 +105,59 @@ static func _generate_extruded_mesh(points: PackedVector2Array, triangle_indices
     arrays.resize(Mesh.ARRAY_MAX)
 
     var vertices : PackedVector3Array = PackedVector3Array()
-    var normals : PackedVector3Array = PackedVector3Array()
-    var uvs : PackedVector2Array = PackedVector2Array()
     var indices : PackedInt32Array = PackedInt32Array()
 
     # Top face
     var top_face_start_index = vertices.size()
     for point in points:
         vertices.append(Vector3(point.x, extrusion_height, point.y))
-        normals.append(Vector3(0, 1, 0)) # Upward normal
-        uvs.append(point)
 
     # Bottom face
     var bottom_face_start_index = vertices.size()
     for point in points:
         vertices.append(Vector3(point.x, 0, point.y))
-        normals.append(Vector3(0, -1, 0)) # Downward normal
-        uvs.append(point)
-
+    
     # Generate top face indices (clockwise)
-    for i in range(points.size() - 2):
-        indices.append(top_face_start_index)
-        indices.append(top_face_start_index + i + 1)
-        indices.append(top_face_start_index + i + 2)
+    for tr in triangle_indices:
+        indices.append(tr)
 
     # Generate bottom face indices (counter-clockwise)
-    for i in range(points.size() - 2):
-        indices.append(bottom_face_start_index)
-        indices.append(bottom_face_start_index + i + 2)
-        indices.append(bottom_face_start_index + i + 1)
+    var rev_triangle_indices = triangle_indices.duplicate()
+    rev_triangle_indices.reverse()
+    for tr in rev_triangle_indices:
+        indices.append(tr + bottom_face_start_index)
 
+    # inverted triangles?
+    # this seems bizarrely accuate
+    var is_inverted = indices[0] > indices[1]
+    
     # Generate side faces
     for i in range(points.size()):
+        #break
         var next_index = (i + 1) % points.size()
 
-        # Side face 1
-        indices.append(top_face_start_index + i)
-        indices.append(bottom_face_start_index + i)
-        indices.append(bottom_face_start_index + next_index)
+        if is_inverted:
+            # Side face 1
+            indices.append(top_face_start_index + i)
+            indices.append(bottom_face_start_index + next_index)
+            indices.append(bottom_face_start_index + i)
 
-        # Side face 2
-        indices.append(top_face_start_index + i)
-        indices.append(bottom_face_start_index + next_index)
-        indices.append(top_face_start_index + next_index)
+            # Side face 2
+            indices.append(top_face_start_index + i)
+            indices.append(top_face_start_index + next_index)
+            indices.append(bottom_face_start_index + next_index)
+        else:
+            # Side face 1
+            indices.append(top_face_start_index + i)
+            indices.append(bottom_face_start_index + i)
+            indices.append(bottom_face_start_index + next_index)
 
-        # Calculate side face normals
-        var v1 = vertices[bottom_face_start_index + i] - vertices[top_face_start_index + i]
-        var v2 = vertices[bottom_face_start_index + next_index] - vertices[top_face_start_index + i]
-        var normal = v1.cross(v2).normalized()
-
-        # Add side face normals (shared by the two triangles)
-        normals.append(normal)
-        normals.append(normal)
-        normals.append(normal)
-        normals.append(normal)
-        normals.append(normal)
-        normals.append(normal)
+            # Side face 2
+            indices.append(top_face_start_index + i)
+            indices.append(bottom_face_start_index + next_index)
+            indices.append(top_face_start_index + next_index)
 
     arrays[Mesh.ARRAY_VERTEX] = vertices
-    #arrays[Mesh.ARRAY_NORMAL] = normals
-    arrays[Mesh.ARRAY_TEX_UV] = uvs
     arrays[Mesh.ARRAY_INDEX] = indices
 
     var mesh = ArrayMesh.new()

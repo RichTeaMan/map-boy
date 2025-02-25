@@ -13,7 +13,7 @@ var last_pos_lat = null
 var last_pos_long = null
 var last_purge_index = 0
 ## Maximum number of entities to check for purging in a single tick
-var purge_amount = 50000
+var purge_amount = 500
 
 var load_window = 0.02
 
@@ -228,6 +228,7 @@ func create_areas(areas):
         for c in area.coordinates:
             var coord_vector = Vector2(c.lat * Global.coord_factor, c.lon * Global.coord_factor)
             vector_2d_list.append(coord_vector - r)
+        
         var area_node = WayRender.create_area_node(area, r, vector_2d_list)
         if area_node != null:
             $map.add_child(area_node)

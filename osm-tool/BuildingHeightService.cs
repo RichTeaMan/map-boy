@@ -86,7 +86,11 @@ public class BuildingHeightService {
         {
             height += 1.5;
         }
-
+        if (tags.TryGetValue("building:levels", out string? buildingLevelsStr)) {
+            if (double.TryParse(buildingLevelsStr, out double buildingLevels)) {
+                height = buildingLevels * 3; // 3m suggested in https://wiki.openstreetmap.org/wiki/Key:building:levels?uselang=en-GB. not a great, but works if height is not specified
+            }
+        }
         if (tags.TryGetValue("min_height", out string? minHeightStr))
         {
             if (double.TryParse(minHeightStr, out double minHeightValue))

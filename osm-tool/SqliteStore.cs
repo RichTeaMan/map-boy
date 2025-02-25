@@ -54,6 +54,8 @@ public class Way
 public class Area
 {
     public long Id { get; set; }
+
+    public required string Source { get; set; }
     public bool? Visible { get; set; }
     public int? Version { get; set; }
     public long? ChangeSet { get; set; }
@@ -76,6 +78,8 @@ public class SqliteStore
     private readonly TileService tileService = new TileService();
 
     private readonly BuildingHeightService heightService = new BuildingHeightService();
+
+    private readonly HighwayBuilderService highwayBuilderService = new HighwayBuilderService();
 
     private string FilePath { get; init; }
 
@@ -285,18 +289,21 @@ public class SqliteStore
         {
             switch (highway)
             {
-                case "motorway":
-                case "trunk":
-                case "primary":
                 case "secondary":
                 case "tertiary":
-                case "residential":
                 case "service":
+                case "residential":
+                    return "white";
+                case "primary":
+                    return "yellow";
+                case "motorway":
+                case "trunk":
                 case "motorway_link":
                 case "trunk_link":
                 case "primary_link":
                 case "secondary_link":
                 case "tertiary_link":
+                    return "red";
                 case "living_street":
                 case "bus_guideway":
                 case "raceway":
@@ -358,6 +365,10 @@ public class SqliteStore
                     return "no-colour";
             }
         }
+        if (tags.TryGetValue("railway", out string? _railwayValue))
+        {
+            return "black";
+        }
         if (tags.TryGetValue("waterway", out string? waterway))
         {
             switch (waterway)
@@ -389,8 +400,10 @@ public class SqliteStore
         {
             return "blue";
         }
-        if (tags.TryGetValue("building:part", out string? buildingPart)) {
-            if (buildingPart == "no") {
+        if (tags.TryGetValue("building:part", out string? buildingPart))
+        {
+            if (buildingPart == "no")
+            {
                 return "no-colour";
             }
         }
@@ -431,6 +444,7 @@ public class SqliteStore
             switch (natural)
             {
                 case "water": return "blue";
+                case "scrub": return "green";
                 case "wood": return "dark-green";
             }
         }
@@ -708,6 +722,32 @@ public class SqliteStore
                 SaveAreaBatch(connection, wayBatch);
             }
         }
+        using (var connection = createConnection())
+        {
+            connection.Open();
+            Console.WriteLine("Writing highways.");
+            var wayBatch = new List<Way>();
+            foreach (var way in FetchWays())
+            {
+                if (way.ClosedLoop)
+                {
+                    continue;
+                }
+                //if (way.Id == 413046623)
+                {
+                    wayBatch.Add(way);
+                }
+                if (wayBatch.Count >= 100)
+                {
+                    SaveHighwayAreaBatch(connection, wayBatch);
+                    wayBatch.Clear();
+                }
+            }
+            if (wayBatch.Any())
+            {
+                SaveHighwayAreaBatch(connection, wayBatch);
+            }
+        }
     }
 
     private void SaveAreaBatch(SqliteConnection connection, List<OsmRelation> relationBatch)
@@ -878,7 +918,6 @@ public class SqliteStore
 
     private void SaveAreaBatch(SqliteConnection connection, List<Way> wayBatch)
     {
-
         var wayIds = wayBatch.Select(w => w.Id).ToArray();
 
         var wayNodes = wayIds.Chunk(1000).SelectMany(chunk =>
@@ -955,13 +994,118 @@ public class SqliteStore
         transaction.Commit();
     }
 
+    private void SaveHighwayAreaBatch(SqliteConnection connection, List<Way> wayBatch)
+    {
+        var wayIds = wayBatch.Select(w => w.Id).ToArray();
+
+        var wayNodes = wayIds.Chunk(1000).SelectMany(chunk =>
+        {
+            var wayNodes = FetchNodesByWayIds(chunk.ToArray());
+            return wayNodes;
+        }).ToDictionary();
+
+        using var transaction = connection.BeginTransaction();
+
+        foreach (var way in wayBatch)
+        {
+            var orderedCoords = new List<Coord>();
+            orderedCoords.AddRange(Coord.FromNodes(wayNodes[way.Id]));
+
+            if (orderedCoords.Count == 0)
+            {
+                Console.WriteLine($"Failed to find any coords for way {way.Id}");
+                continue;
+            }
+            double width = 0.0;
+            var wayTags = way.TagsToDict();
+            if (wayTags.TryGetValue("highway", out string? highwayValue))
+            {
+                switch (highwayValue)
+                {
+                    case "primary":
+                        width = 0.00004;
+                        break;
+                    case "secondary":
+                    case "tertiary":
+                    case "service":
+                    case "residential":
+                        width = 0.00002;
+                        break;
+                    case "motorway":
+                    case "trunk":
+                    case "motorway_link":
+                    case "trunk_link":
+                    case "primary_link":
+                    case "secondary_link":
+                    case "tertiary_link":
+                        width = 0.00008;
+                        break;
+                }
+            }
+            else if (wayTags.TryGetValue("railway", out string? railwayValue))
+            {
+                switch (highwayValue)
+                {
+                    case "rail":
+                        width = 0.00002;
+                        break;
+                }
+            }
+            if (width == 0.0)
+            {
+                continue;
+            }
+
+            string suggestedColour = calcSuggestedColour(wayTags);
+            if (suggestedColour == "unknown")
+            {
+                Console.WriteLine($"Way {way.Id} has an unknown colour, skipping.");
+                continue;
+            }
+            else if (suggestedColour == "no-colour")
+            {
+                continue;
+            }
+
+            var highwayCoords = highwayBuilderService.CalcHighwayCoordinates(orderedCoords, width)
+                //.Reverse<Coord>()
+                .ToArray();
+            var tile = tileService.CalcTileId(orderedCoords.Average(n => n.Lat), orderedCoords.Average(n => n.Lon));
+
+            var coords = string.Join(";", highwayCoords.Select(id => $"{id.Lat},{id.Lon}"));
+            using var insertAreaCommand = connection.CreateCommand();
+            insertAreaCommand.CommandText = @"
+                    INSERT INTO area (source, visible, version, change_set, timestamp, user, uid, coords, name, suggested_colour, tile_id, layer, height, min_height, is_large)
+                        VALUES($source, $visible, $version, $change_set, $timestamp, $user, $uid, $coords, $name, $suggested_colour, $tile_id, $layer, $height, $min_height, $is_large);
+                    ";
+            insertAreaCommand.Parameters.AddWithValue("$source", $"way-{way.Id}");
+            insertAreaCommand.Parameters.AddWithValue("$visible", way.Visible as object ?? DBNull.Value);
+            insertAreaCommand.Parameters.AddWithValue("$version", way.Version as object ?? DBNull.Value);
+            insertAreaCommand.Parameters.AddWithValue("$change_set", way.ChangeSet);
+            insertAreaCommand.Parameters.AddWithValue("$timestamp", way.Timestamp?.ToString("yyyy-MM-ddTHH:mm:ssZ") as object ?? DBNull.Value);
+            insertAreaCommand.Parameters.AddWithValue("$user", way.User as object ?? DBNull.Value);
+            insertAreaCommand.Parameters.AddWithValue("$uid", way.Uid as object ?? DBNull.Value);
+            insertAreaCommand.Parameters.AddWithValue("$coords", coords);
+            insertAreaCommand.Parameters.AddWithValue("$name", wayTags.TryGetValue("name", out string? nameValue) ? nameValue : DBNull.Value);
+            insertAreaCommand.Parameters.AddWithValue("$suggested_colour", suggestedColour);
+            insertAreaCommand.Parameters.AddWithValue("$tile_id", tile);
+            insertAreaCommand.Parameters.AddWithValue("$layer", wayTags.TryGetValue("layer", out string? layerValue) ? layerValue : 0);
+            insertAreaCommand.Parameters.AddWithValue("$height", 0.1);
+            insertAreaCommand.Parameters.AddWithValue("$min_height", 0.0);
+            insertAreaCommand.Parameters.AddWithValue("$is_large", false);
+
+            insertAreaCommand.ExecuteNonQuery();
+        }
+        transaction.Commit();
+    }
+
     public IEnumerable<Area> FetchAreas(long[]? ids = null, long[]? tileIds = null)
     {
         using var connection = createConnection();
         connection.Open();
 
         using var command = connection.CreateCommand();
-        command.CommandText = @"SELECT id, visible, version, change_set, timestamp, user, uid, coords, name, suggested_colour, tile_id, layer, height, min_height, is_large FROM area";
+        command.CommandText = @"SELECT id, source, visible, version, change_set, timestamp, user, uid, coords, name, suggested_colour, tile_id, layer, height, min_height, is_large FROM area";
 
         var whereClauses = new List<string>();
 
@@ -988,6 +1132,7 @@ public class SqliteStore
             yield return new Area
             {
                 Id = reader.GetInt64("id"),
+                Source = reader.GetString("source"),
                 Visible = reader.GetBoolean("visible"),
                 Version = reader.GetInt32("version"),
                 ChangeSet = reader.GetInt64("change_set"),

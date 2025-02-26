@@ -53,7 +53,7 @@ public class BuildingHeightService {
             switch (natural)
             {
                 case "water":
-                    height += 0.1;
+                    height += 0.15;
                     break;
                 case "wood":
                 case "tree":

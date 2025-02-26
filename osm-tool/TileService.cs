@@ -39,6 +39,16 @@ public class TileService
         return tile;
     }
 
+    public long CalcTileId(IEnumerable<Coord> coords)
+    {
+        return CalcTileId(coords.Average(n => n.Lat), coords.Average(n => n.Lon));
+    }
+
+    public long CalcTileId(Coord[][] coords)
+    {
+        return CalcTileId(coords.SelectMany(c => c));
+    }
+
     private void CalcRowColumn(double lat, double lon, out long latTile, out long lonTile)
     {
         var resolvedLat = lat + 180.0;
@@ -66,6 +76,11 @@ public class TileService
         }
     }
 
+    public LargeTileRangeResult CalcLargeTileRange(Coord[][] coords)
+    {
+        return CalcLargeTileRange(coords.SelectMany(c => c));
+    }
+
     public LargeTileRangeResult CalcLargeTileRange(IEnumerable<Coord> coords)
     {
         var minLat = coords.Min(c => c.Lat);
@@ -79,7 +94,8 @@ public class TileService
         double bigDiff = 0.01; // idk, this value might work?
         bool isLarge = latDiff > bigDiff || lonDiff > bigDiff;
         var tiles = new List<Tile>();
-        if (isLarge) {
+        if (isLarge)
+        {
             tiles = CalcTileIdsInRange(minLat, minLon, maxLat, maxLon).ToList();
         }
         return new LargeTileRangeResult { Tiles = tiles, IsLarge = isLarge };

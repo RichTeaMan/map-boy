@@ -61,7 +61,8 @@ func shape_draw():
             "id": 0,
             "name": "test",
             "closedLoop": true,
-            "suggestedColour": "yellow"
+            "suggestedColour": "yellow",
+            "height": 0.1
         }
         var way = {
             "id": 0,
@@ -69,7 +70,12 @@ func shape_draw():
             "closedLoop": false,
             "suggestedColour": "purple"
         }
-        var area_node = WayRender.create_area_node(area, coords)
+        #var vector_2d_list := PackedVector2Array()
+        #var r = Vector2(area.coordinates[0].lat * Global.coord_factor, area.coordinates[0].lon * Global.coord_factor)
+       # for c in area.coordinates:
+        #    var coord_vector = Vector2(c.lat * Global.coord_factor, c.lon * Global.coord_factor)
+       #     vector_2d_list.append(coord_vector - r)
+        var area_node = WayRender.create_area_node(area, coords[0], coords)
         if area_node != null:
             for child in %shapes.get_children():
                 child.queue_free()

@@ -62,7 +62,8 @@ public class Area
     public DateTimeOffset? Timestamp { get; set; }
     public string? User { get; set; }
     public long? Uid { get; set; }
-    public required List<Coord> Coordinates { get; set; }
+    public required Coord[][] OuterCoordinates { get; set; }
+    public required Coord[][] InnerCoordinates { get; set; }
     public string? Name { get; set; }
     public required string SuggestedColour { get; set; }
     public long TileId { get; set; }
@@ -659,7 +660,8 @@ public class SqliteStore
                 timestamp TEXT NULL,
                 user TEXT NOT NULL,
                 uid INTEGER NULL,
-                coords TEXT NOT NULL,
+                outer_coords TEXT NOT NULL,
+                inner_coords TEXT NOT NULL,
                 name TEXT NULL,
                 suggested_colour TEXT NOT NULL,
                 tile_id INTEGER NOT NULL,
@@ -769,9 +771,9 @@ public class SqliteStore
 
         foreach (var relation in relationBatch)
         {
-            // bravely ignoring inner polygons
-            //var _innerWays = relation.Members.Where(m => m.Role == "inner").Select(m => m.Id);
-            //var _innerCoords = FetchWays().Where(w => _innerWays.Contains(w.Id)).SelectMany(w => w.Coordinates);
+            var innerWayIds = relation.Members.Where(m => m.Role == "inner" && m.Type == "way").Select(m => m.Id);
+            // bravely ignoring inner polygons that are not closed
+            var innerWays = innerWayIds.Select(w => waysDict.GetValueOrDefault(w)!).Where(w => w != null && w.ClosedLoop).ToArray();
 
             var outerWayIds = relation.Members.Where(m => m.Role == "outer" && m.Type == "way").Select(m => m.Id);
             var outerWaysWithNulls = outerWayIds.Select(w => waysDict.GetValueOrDefault(w)!).ToArray();
@@ -782,76 +784,94 @@ public class SqliteStore
                 continue;
             }
             int closedLoops = outerWays.Count(w => w.ClosedLoop);
-            if (closedLoops > 0 && outerWays.Count() > 1)
-            {
-                Console.WriteLine($"Skipping multipolygon relation {relation.Id} with multiple closed loops...");
-                continue;
+            if (closedLoops > 1) {
+                Console.WriteLine($"!!!!! {relation.Id} closed");
             }
             if (outerWaysWithNulls.Any(w => w == null))
             {
                 Console.WriteLine($"relation {relation.Id} is incomplete.");
             }
 
-            // osm polygons are closed, however we do not always have the entire polygon.
-            // some fiddly code to close it ourselves
-            var unusedWays = new List<Way>(outerWays);
-            var orderedCoords = new List<Coord>();
-            orderedCoords.AddRange(Coord.FromNodes(wayNodes[unusedWays.First().Id]));
-            unusedWays.Remove(unusedWays.First());
-
-            while (unusedWays.Count > 0)
+            var unusedWays = new List<Way>();
+            var loopCoords = new List<Coord[]>();
+            foreach (var way in outerWays)
             {
-                // find next coord with shortest distance
-                double shortest = double.MaxValue;
-                Coord[]? nextCoordinates = null;
-                Way? nextWay = null;
-                bool reversed = false;
-                foreach (var way in unusedWays)
+                if (way.ClosedLoop)
                 {
-                    var wayCoords = Coord.FromNodes(wayNodes[way.Id]);
-                    var dist = wayCoords.First().DistanceSquaredTo(orderedCoords.Last());
-                    if (dist < shortest)
-                    {
-                        shortest = dist;
-                        nextCoordinates = wayCoords;
-                        nextWay = way;
-                        reversed = false;
-                    }
-
-                    dist = wayCoords.Last().DistanceSquaredTo(orderedCoords.Last());
-                    if (dist < shortest)
-                    {
-                        shortest = dist;
-                        nextCoordinates = wayCoords;
-                        nextWay = way;
-                        reversed = true;
-                    }
+                    loopCoords.Add(Coord.FromNodes(wayNodes[way.Id]));
                 }
-
-                if (nextCoordinates == null || nextWay == null)
+                else
                 {
-                    Console.WriteLine($"Failed to find next way for relation {relation.Id}");
-                    break;
+                    unusedWays.Add(way);
                 }
-
-                var nextRange = reversed ? nextCoordinates.Reverse<Coord>() : nextCoordinates;
-                if (shortest == 0.0)
-                {
-                    nextRange = nextRange.Skip(1);
-                }
-                orderedCoords.AddRange(nextRange);
-                unusedWays.Remove(nextWay);
             }
 
-            if (orderedCoords.Count == 0)
+            if (unusedWays.Count > 0)
             {
-                Console.WriteLine($"Failed to find any coords for relation {relation.Id}");
-                continue;
-            }
-            // ensure loop is closed
-            if (!orderedCoords.First().LocationEquals(orderedCoords.Last()))
-            {
-                orderedCoords.Add(orderedCoords.First());
+                // osm polygons are closed, however we do not always have the entire polygon.
+                // some fiddly code to close it ourselves
+                var orderedCoords = new List<Coord>();
+                orderedCoords.AddRange(Coord.FromNodes(wayNodes[unusedWays.First().Id]));
+                unusedWays.Remove(unusedWays.First());
+
+                while (unusedWays.Count > 0)
+                {
+                    // find next coord with shortest distance
+                    double shortest = double.MaxValue;
+                    Coord[]? nextCoordinates = null;
+                    Way? nextWay = null;
+                    bool reversed = false;
+                    foreach (var way in unusedWays)
+                    {
+                        var wayCoords = Coord.FromNodes(wayNodes[way.Id]);
+                        var dist = wayCoords.First().DistanceSquaredTo(orderedCoords.Last());
+                        if (dist < shortest)
+                        {
+                            shortest = dist;
+                            nextCoordinates = wayCoords;
+                            nextWay = way;
+                            reversed = false;
+                        }
+
+                        dist = wayCoords.Last().DistanceSquaredTo(orderedCoords.Last());
+                        if (dist < shortest)
+                        {
+                            shortest = dist;
+                            nextCoordinates = wayCoords;
+                            nextWay = way;
+                            reversed = true;
+                        }
+                    }
+
+                    if (nextCoordinates == null || nextWay == null)
+                    {
+                        Console.WriteLine($"Failed to find next way for relation {relation.Id}");
+                        break;
+                    }
+
+                    var nextRange = reversed ? nextCoordinates.Reverse<Coord>() : nextCoordinates;
+                    if (shortest == 0.0)
+                    {
+                        nextRange = nextRange.Skip(1);
+                    }
+                    orderedCoords.AddRange(nextRange);
+                    unusedWays.Remove(nextWay);
+                }
+
+
+                if (orderedCoords.Count == 0)
+                {
+                    Console.WriteLine($"Failed to find non-closed coords for relation {relation.Id}");
+                }
+                else
+                {
+                    // ensure loop is closed
+                    if (!orderedCoords.First().LocationEquals(orderedCoords.Last()))
+                    {
+                        orderedCoords.Add(orderedCoords.First());
+                    }
+                    loopCoords.Add(orderedCoords.ToArray());
+                }
             }
 
             string suggestedColour = calcSuggestedColour(relation.Tags);
@@ -862,14 +882,16 @@ public class SqliteStore
             else if (suggestedColour != "no-colour")
             {
 
-                var largeTileResult = tileService.CalcLargeTileRange(orderedCoords);
+                var coords = loopCoords.ToArray();
+                var innerCoords = innerWays.Select(w => Coord.FromNodes(wayNodes[w.Id])).ToArray();
+                var largeTileResult = tileService.CalcLargeTileRange(coords);
                 var heightResult = heightService.CalcBuildingHeight(relation.Tags);
+                var tileId = tileService.CalcTileId(coords);
 
-                var coords = string.Join(";", orderedCoords.Select(id => $"{id.Lat},{id.Lon}"));
                 using var insertAreaCommand = connection.CreateCommand();
                 insertAreaCommand.CommandText = @"
-                    INSERT INTO area (source, visible, version, change_set, timestamp, user, uid, coords, name, suggested_colour, tile_id, layer, height, min_height, is_large)
-                        VALUES($source, $visible, $version, $change_set, $timestamp, $user, $uid, $coords, $name, $suggested_colour, $tile_id, $layer, $height, $min_height, $is_large)
+                    INSERT INTO area (source, visible, version, change_set, timestamp, user, uid, outer_coords, inner_coords, name, suggested_colour, tile_id, layer, height, min_height, is_large)
+                        VALUES($source, $visible, $version, $change_set, $timestamp, $user, $uid, $outer_coords, $inner_coords, $name, $suggested_colour, $tile_id, $layer, $height, $min_height, $is_large)
                         RETURNING id;
                     ";
                 insertAreaCommand.Parameters.AddWithValue("$source", $"relation-{relation.Id}");
@@ -879,10 +901,11 @@ public class SqliteStore
                 insertAreaCommand.Parameters.AddWithValue("$timestamp", relation.Timestamp?.ToString("yyyy-MM-ddTHH:mm:ssZ") as object ?? DBNull.Value);
                 insertAreaCommand.Parameters.AddWithValue("$user", relation.User as object ?? DBNull.Value);
                 insertAreaCommand.Parameters.AddWithValue("$uid", relation.Uid as object ?? DBNull.Value);
-                insertAreaCommand.Parameters.AddWithValue("$coords", coords);
+                insertAreaCommand.Parameters.AddWithValue("$outer_coords", coords.AsString());
+                insertAreaCommand.Parameters.AddWithValue("$inner_coords", innerCoords.AsString());
                 insertAreaCommand.Parameters.AddWithValue("$name", relation.Tags.TryGetValue("name", out string? nameValue) ? nameValue : DBNull.Value);
                 insertAreaCommand.Parameters.AddWithValue("$suggested_colour", suggestedColour);
-                insertAreaCommand.Parameters.AddWithValue("$tile_id", tileService.CalcTileId(orderedCoords.Average(n => n.Lat), orderedCoords.Average(n => n.Lon)));
+                insertAreaCommand.Parameters.AddWithValue("$tile_id", tileId);
                 insertAreaCommand.Parameters.AddWithValue("$layer", relation.Tags.TryGetValue("layer", out string? layerValue) ? layerValue : 0);
                 insertAreaCommand.Parameters.AddWithValue("$height", heightResult.Height);
                 insertAreaCommand.Parameters.AddWithValue("$min_height", heightResult.MinHeight);
@@ -954,11 +977,11 @@ public class SqliteStore
             var largeTileResult = tileService.CalcLargeTileRange(orderedCoords);
             var heightResult = heightService.CalcBuildingHeight(wayTags);
 
-            var coords = string.Join(";", orderedCoords.Select(id => $"{id.Lat},{id.Lon}"));
+            var coords = orderedCoords.ToArray().AsString();
             using var insertAreaCommand = connection.CreateCommand();
             insertAreaCommand.CommandText = @"
-                    INSERT INTO area (source, visible, version, change_set, timestamp, user, uid, coords, name, suggested_colour, tile_id, layer, height, min_height, is_large)
-                        VALUES($source, $visible, $version, $change_set, $timestamp, $user, $uid, $coords, $name, $suggested_colour, $tile_id, $layer, $height, $min_height, $is_large);
+                    INSERT INTO area (source, visible, version, change_set, timestamp, user, uid, outer_coords, inner_coords, name, suggested_colour, tile_id, layer, height, min_height, is_large)
+                        VALUES($source, $visible, $version, $change_set, $timestamp, $user, $uid, $outer_coords, $inner_coords, $name, $suggested_colour, $tile_id, $layer, $height, $min_height, $is_large);
                     ";
             insertAreaCommand.Parameters.AddWithValue("$source", $"way-{way.Id}");
             insertAreaCommand.Parameters.AddWithValue("$visible", way.Visible as object ?? DBNull.Value);
@@ -967,7 +990,8 @@ public class SqliteStore
             insertAreaCommand.Parameters.AddWithValue("$timestamp", way.Timestamp?.ToString("yyyy-MM-ddTHH:mm:ssZ") as object ?? DBNull.Value);
             insertAreaCommand.Parameters.AddWithValue("$user", way.User as object ?? DBNull.Value);
             insertAreaCommand.Parameters.AddWithValue("$uid", way.Uid as object ?? DBNull.Value);
-            insertAreaCommand.Parameters.AddWithValue("$coords", coords);
+            insertAreaCommand.Parameters.AddWithValue("$outer_coords", coords);
+            insertAreaCommand.Parameters.AddWithValue("$inner_coords", "");
             insertAreaCommand.Parameters.AddWithValue("$name", wayTags.TryGetValue("name", out string? nameValue) ? nameValue : DBNull.Value);
             insertAreaCommand.Parameters.AddWithValue("$suggested_colour", suggestedColour);
             insertAreaCommand.Parameters.AddWithValue("$tile_id", tileService.CalcTileId(orderedCoords.Average(n => n.Lat), orderedCoords.Average(n => n.Lon)));
@@ -1072,11 +1096,11 @@ public class SqliteStore
                 .ToArray();
             var tile = tileService.CalcTileId(orderedCoords.Average(n => n.Lat), orderedCoords.Average(n => n.Lon));
 
-            var coords = string.Join(";", highwayCoords.Select(id => $"{id.Lat},{id.Lon}"));
+            var coords = highwayCoords.ToArray().AsString();
             using var insertAreaCommand = connection.CreateCommand();
             insertAreaCommand.CommandText = @"
-                    INSERT INTO area (source, visible, version, change_set, timestamp, user, uid, coords, name, suggested_colour, tile_id, layer, height, min_height, is_large)
-                        VALUES($source, $visible, $version, $change_set, $timestamp, $user, $uid, $coords, $name, $suggested_colour, $tile_id, $layer, $height, $min_height, $is_large);
+                    INSERT INTO area (source, visible, version, change_set, timestamp, user, uid, outer_coords, inner_coords, name, suggested_colour, tile_id, layer, height, min_height, is_large)
+                        VALUES($source, $visible, $version, $change_set, $timestamp, $user, $uid, $outer_coords, $inner_coords, $name, $suggested_colour, $tile_id, $layer, $height, $min_height, $is_large);
                     ";
             insertAreaCommand.Parameters.AddWithValue("$source", $"way-{way.Id}");
             insertAreaCommand.Parameters.AddWithValue("$visible", way.Visible as object ?? DBNull.Value);
@@ -1085,7 +1109,8 @@ public class SqliteStore
             insertAreaCommand.Parameters.AddWithValue("$timestamp", way.Timestamp?.ToString("yyyy-MM-ddTHH:mm:ssZ") as object ?? DBNull.Value);
             insertAreaCommand.Parameters.AddWithValue("$user", way.User as object ?? DBNull.Value);
             insertAreaCommand.Parameters.AddWithValue("$uid", way.Uid as object ?? DBNull.Value);
-            insertAreaCommand.Parameters.AddWithValue("$coords", coords);
+            insertAreaCommand.Parameters.AddWithValue("$outer_coords", coords);
+            insertAreaCommand.Parameters.AddWithValue("$inner_coords", "");
             insertAreaCommand.Parameters.AddWithValue("$name", wayTags.TryGetValue("name", out string? nameValue) ? nameValue : DBNull.Value);
             insertAreaCommand.Parameters.AddWithValue("$suggested_colour", suggestedColour);
             insertAreaCommand.Parameters.AddWithValue("$tile_id", tile);
@@ -1105,7 +1130,7 @@ public class SqliteStore
         connection.Open();
 
         using var command = connection.CreateCommand();
-        command.CommandText = @"SELECT id, source, visible, version, change_set, timestamp, user, uid, coords, name, suggested_colour, tile_id, layer, height, min_height, is_large FROM area";
+        command.CommandText = @"SELECT id, source, visible, version, change_set, timestamp, user, uid, outer_coords, inner_coords, name, suggested_colour, tile_id, layer, height, min_height, is_large FROM area";
 
         var whereClauses = new List<string>();
 
@@ -1139,11 +1164,8 @@ public class SqliteStore
                 Timestamp = DateTimeOffset.Parse(reader.GetString("timestamp")),
                 User = reader.GetString("user"),
                 Uid = reader.GetInt64("uid"),
-                Coordinates = reader.GetString("coords").Split(';').Select(s =>
-                {
-                    var coords = s.Split(',');
-                    return new Coord { Lat = double.Parse(coords[0]), Lon = double.Parse(coords[1]) };
-                }).ToList(),
+                OuterCoordinates = reader.GetString("outer_coords").CoordsFromString(),
+                InnerCoordinates = reader.GetString("inner_coords").CoordsFromString(),
                 Name = reader.NullableString("name"),
                 SuggestedColour = reader.GetString("suggested_colour"),
                 TileId = reader.GetInt64("tile_id"),

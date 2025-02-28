@@ -75,6 +75,12 @@ public class Program
         })
         .WithName("GetTileIdRange");
 
+        app.MapGet("/search/{searchTerm}", (string searchTerm) => {
+            var store = createSqliteStore();
+            return store.SearchAreas(searchTerm).ToArray();
+        })
+        .WithName("SearchAreas");
+
         app.Run();
     }
 }

@@ -47,6 +47,10 @@ public class Program
         
         Console.WriteLine("Saving multipolygon relations...");
         store.SaveAreas(reader);
+
+        Console.WriteLine("Building search index...");
+        store.BuildSearchIndex();
+
         var endTime = DateTimeOffset.Now;
         var duration = endTime - startTime;
         Console.WriteLine($"Complete in {duration.TotalMinutes} minutes.");

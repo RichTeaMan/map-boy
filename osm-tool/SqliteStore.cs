@@ -11,6 +11,14 @@ public record Coord
     public double Lat { get; set; }
     public double Lon { get; set; }
 
+    public Coord() { }
+
+    public Coord(double lat, double lon) : this()
+    {
+        Lat = lat;
+        Lon = lon;
+    }
+
     public double DistanceTo(Coord other)
     {
         return Math.Sqrt(Math.Pow(Lat - other.Lat, 2) + Math.Pow(Lon - other.Lon, 2));
@@ -153,6 +161,7 @@ public class SqliteStore
         foreach (var node in nodeBatch)
         {
             using var insertNodeCommand = connection.CreateCommand();
+            insertNodeCommand.Transaction = transaction;
             insertNodeCommand.CommandText = @"
                 INSERT INTO node (id, visible, version, change_set, timestamp, user, uid, lat, lon, tile_id, layer)
                     VALUES($id, $visible, $version, $change_set, $timestamp, $user, $uid, $lat, $lon, $tile_id, $layer);
@@ -533,6 +542,7 @@ public class SqliteStore
             wayTotal++;
 
             using var insertWayCommand = connection.CreateCommand();
+            insertWayCommand.Transaction = transaction;
             insertWayCommand.CommandText = @"
                     INSERT INTO way (id, visible, version, change_set, timestamp, user, uid, closed_loop, tags)
                         VALUES($id, $visible, $version, $change_set, $timestamp, $user, $uid, $closed_loop, $tags);
@@ -735,10 +745,7 @@ public class SqliteStore
                 {
                     continue;
                 }
-                //if (way.Id == 413046623)
-                {
-                    wayBatch.Add(way);
-                }
+                wayBatch.Add(way);
                 if (wayBatch.Count >= 100)
                 {
                     SaveHighwayAreaBatch(connection, wayBatch);
@@ -784,7 +791,8 @@ public class SqliteStore
                 continue;
             }
             int closedLoops = outerWays.Count(w => w.ClosedLoop);
-            if (closedLoops > 1) {
+            if (closedLoops > 1)
+            {
                 Console.WriteLine($"!!!!! {relation.Id} closed");
             }
             if (outerWaysWithNulls.Any(w => w == null))
@@ -889,6 +897,7 @@ public class SqliteStore
                 var tileId = tileService.CalcTileId(coords);
 
                 using var insertAreaCommand = connection.CreateCommand();
+                insertAreaCommand.Transaction = transaction;
                 insertAreaCommand.CommandText = @"
                     INSERT INTO area (source, visible, version, change_set, timestamp, user, uid, outer_coords, inner_coords, name, suggested_colour, tile_id, layer, height, min_height, is_large)
                         VALUES($source, $visible, $version, $change_set, $timestamp, $user, $uid, $outer_coords, $inner_coords, $name, $suggested_colour, $tile_id, $layer, $height, $min_height, $is_large)
@@ -979,6 +988,7 @@ public class SqliteStore
 
             var coords = orderedCoords.ToArray().AsString();
             using var insertAreaCommand = connection.CreateCommand();
+            insertAreaCommand.Transaction = transaction;
             insertAreaCommand.CommandText = @"
                     INSERT INTO area (source, visible, version, change_set, timestamp, user, uid, outer_coords, inner_coords, name, suggested_colour, tile_id, layer, height, min_height, is_large)
                         VALUES($source, $visible, $version, $change_set, $timestamp, $user, $uid, $outer_coords, $inner_coords, $name, $suggested_colour, $tile_id, $layer, $height, $min_height, $is_large);
@@ -1098,6 +1108,7 @@ public class SqliteStore
 
             var coords = highwayCoords.ToArray().AsString();
             using var insertAreaCommand = connection.CreateCommand();
+            insertAreaCommand.Transaction = transaction;
             insertAreaCommand.CommandText = @"
                     INSERT INTO area (source, visible, version, change_set, timestamp, user, uid, outer_coords, inner_coords, name, suggested_colour, tile_id, layer, height, min_height, is_large)
                         VALUES($source, $visible, $version, $change_set, $timestamp, $user, $uid, $outer_coords, $inner_coords, $name, $suggested_colour, $tile_id, $layer, $height, $min_height, $is_large);
@@ -1190,6 +1201,104 @@ public class SqliteStore
         {
             var areaId = reader.GetInt64(0);
             yield return areaId;
+        }
+    }
+
+    public void BuildSearchIndex()
+    {
+        using var connection = createConnection();
+        connection.Open();
+
+        using var searchIndexTableCommand = connection.CreateCommand();
+        searchIndexTableCommand.CommandText = @"
+            CREATE TABLE search_index (
+                name TEXT NULL,
+                lat REAL NOT NULL,
+                lon REAL NOT NULL
+            );
+            CREATE INDEX idx_search_index_name ON search_index (name);
+            ";
+
+        searchIndexTableCommand.ExecuteNonQuery();
+
+        var searchIndexBatch = new List<Tuple<string, Coord>>();
+
+        var commit = () =>
+        {
+            if (searchIndexBatch.Count == 0)
+            {
+                return;
+            }
+            using var transaction = connection.BeginTransaction();
+            foreach (var searchIndexTuple in searchIndexBatch)
+            {
+                var batchName = searchIndexTuple.Item1;
+                var batchCoord = searchIndexTuple.Item2;
+                using var searchIndexCommand = connection.CreateCommand();
+                searchIndexCommand.Transaction = transaction;
+                searchIndexCommand.CommandText = @"
+                        INSERT INTO search_index (name, lat, lon)
+                        VALUES ($name, $lat, $lon);
+                    ";
+                searchIndexCommand.Parameters.AddWithValue("$name", batchName);
+                searchIndexCommand.Parameters.AddWithValue("$lat", batchCoord.Lat);
+                searchIndexCommand.Parameters.AddWithValue("$lon", batchCoord.Lon);
+
+                searchIndexCommand.ExecuteNonQuery();
+            }
+            transaction.Commit();
+            searchIndexBatch.Clear();
+        };
+
+        foreach (var area in FetchAreas())
+        {
+            string? areaName = area?.Name;
+            if (areaName == null)
+            {
+                continue;
+            }
+            var coord = area?.OuterCoordinates?.FirstOrDefault()?.FirstOrDefault();
+            if (coord == null)
+            {
+                continue;
+            }
+            searchIndexBatch.Add(new Tuple<string, Coord>(areaName, coord));
+
+            if (searchIndexBatch.Count >= 1000)
+            {
+                commit();
+            }
+        }
+        commit();
+    }
+
+    public class SearchIndexResult
+    {
+        public required string Name { get; set; }
+        public double Lat { get; set; }
+        public double Lon { get; set; }
+    }
+
+    public IEnumerable<SearchIndexResult> SearchAreas(string searchTerm)
+    {
+        using var connection = createConnection();
+        connection.Open();
+
+        using var command = connection.CreateCommand();
+        command.CommandText = @"
+            SELECT name, lat, lon FROM search_index WHERE name LIKE $name;
+        ";//.Replace("$name", searchTerm);
+        command.Parameters.AddWithValue("$name", $"%{searchTerm}%");
+
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            yield return new SearchIndexResult
+            {
+                Name = reader.GetString("name"),
+                Lat = reader.GetDouble("lat"),
+                Lon = reader.GetDouble("lon")
+            };
         }
     }
 }

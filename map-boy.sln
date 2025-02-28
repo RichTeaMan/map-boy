@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "osm-tool", "osm-tool\osm-to
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "osm-api", "osm-api\osm-api.csproj", "{4B05C6BF-AEA4-41CB-AC4F-C21FDA6FC066}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "osm-tool-test", "osm-tool-test\osm-tool-test.csproj", "{83060836-A39E-42F7-9E25-820A7E8F2B5D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -24,5 +26,9 @@ Global
 		{4B05C6BF-AEA4-41CB-AC4F-C21FDA6FC066}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4B05C6BF-AEA4-41CB-AC4F-C21FDA6FC066}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4B05C6BF-AEA4-41CB-AC4F-C21FDA6FC066}.Release|Any CPU.Build.0 = Release|Any CPU
+		{83060836-A39E-42F7-9E25-820A7E8F2B5D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{83060836-A39E-42F7-9E25-820A7E8F2B5D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{83060836-A39E-42F7-9E25-820A7E8F2B5D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{83060836-A39E-42F7-9E25-820A7E8F2B5D}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

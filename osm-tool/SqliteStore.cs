@@ -681,6 +681,7 @@ public class SqliteStore
                 is_large INTEGER NOT NULL
             );
             CREATE INDEX idx_area_tile_id ON area (tile_id);
+            CREATE INDEX idx_area_source ON area (source);
 
             CREATE TABLE IF NOT EXISTS tile_area_map (
                 area_id INTEGER NOT NULL,
@@ -700,20 +701,18 @@ public class SqliteStore
                     relationBatch.Add(relation);
                     if (relationBatch.Count >= 100)
                     {
-                        SaveAreaBatch(connection, relationBatch);
+                        SaveAreaBatch(relationBatch);
                         relationBatch.Clear();
                     }
                 }
             }
             if (relationBatch.Any())
             {
-                SaveAreaBatch(connection, relationBatch);
+                SaveAreaBatch(relationBatch);
             }
         }
 
-        using (var connection = createConnection())
         {
-            connection.Open();
             Console.WriteLine("Writing single polygon areas.");
             var wayBatch = new List<Way>();
             foreach (var way in FetchWays())
@@ -725,18 +724,17 @@ public class SqliteStore
                 wayBatch.Add(way);
                 if (wayBatch.Count >= 100)
                 {
-                    SaveAreaBatch(connection, wayBatch);
+                    SaveAreaBatch(wayBatch);
                     wayBatch.Clear();
                 }
             }
             if (wayBatch.Any())
             {
-                SaveAreaBatch(connection, wayBatch);
+                SaveAreaBatch(wayBatch);
             }
         }
-        using (var connection = createConnection())
+        
         {
-            connection.Open();
             Console.WriteLine("Writing highways.");
             var wayBatch = new List<Way>();
             foreach (var way in FetchWays())
@@ -748,19 +746,22 @@ public class SqliteStore
                 wayBatch.Add(way);
                 if (wayBatch.Count >= 100)
                 {
-                    SaveHighwayAreaBatch(connection, wayBatch);
+                    SaveHighwayAreaBatch(wayBatch);
                     wayBatch.Clear();
                 }
             }
             if (wayBatch.Any())
             {
-                SaveHighwayAreaBatch(connection, wayBatch);
+                SaveHighwayAreaBatch(wayBatch);
             }
         }
     }
 
-    private void SaveAreaBatch(SqliteConnection connection, List<OsmRelation> relationBatch)
+    private void SaveAreaBatch(List<OsmRelation> relationBatch)
     {
+        var databaseAreas = new List<Area>();
+        var largeTilesDict = new Dictionary<string, long[]>();
+        var areaWayParentDict = new Dictionary<long, long[]>();
         var wayIds = relationBatch.SelectMany(r => r.Members).Where(m => m.Type == "way").Select(m => m.Id).Distinct();
 
         var waysDict = wayIds.Chunk(1000).SelectMany(chunk =>
@@ -773,8 +774,6 @@ public class SqliteStore
             var wayNodes = FetchNodesByWayIds(chunk.ToArray());
             return wayNodes;
         }).ToDictionary();
-
-        using var transaction = connection.BeginTransaction();
 
         foreach (var relation in relationBatch)
         {
@@ -791,10 +790,6 @@ public class SqliteStore
                 continue;
             }
             int closedLoops = outerWays.Count(w => w.ClosedLoop);
-            if (closedLoops > 1)
-            {
-                Console.WriteLine($"!!!!! {relation.Id} closed");
-            }
             if (outerWaysWithNulls.Any(w => w == null))
             {
                 Console.WriteLine($"relation {relation.Id} is incomplete.");
@@ -866,7 +861,6 @@ public class SqliteStore
                     unusedWays.Remove(nextWay);
                 }
 
-
                 if (orderedCoords.Count == 0)
                 {
                     Console.WriteLine($"Failed to find non-closed coords for relation {relation.Id}");
@@ -889,67 +883,77 @@ public class SqliteStore
             }
             else if (suggestedColour != "no-colour")
             {
-
                 var coords = loopCoords.ToArray();
                 var innerCoords = innerWays.Select(w => Coord.FromNodes(wayNodes[w.Id])).ToArray();
                 var largeTileResult = tileService.CalcLargeTileRange(coords);
                 var heightResult = heightService.CalcBuildingHeight(relation.Tags);
                 var tileId = tileService.CalcTileId(coords);
 
-                using var insertAreaCommand = connection.CreateCommand();
-                insertAreaCommand.Transaction = transaction;
-                insertAreaCommand.CommandText = @"
-                    INSERT INTO area (source, visible, version, change_set, timestamp, user, uid, outer_coords, inner_coords, name, suggested_colour, tile_id, layer, height, min_height, is_large)
-                        VALUES($source, $visible, $version, $change_set, $timestamp, $user, $uid, $outer_coords, $inner_coords, $name, $suggested_colour, $tile_id, $layer, $height, $min_height, $is_large)
-                        RETURNING id;
-                    ";
-                insertAreaCommand.Parameters.AddWithValue("$source", $"relation-{relation.Id}");
-                insertAreaCommand.Parameters.AddWithValue("$visible", relation.Visible as object ?? DBNull.Value);
-                insertAreaCommand.Parameters.AddWithValue("$version", relation.Version as object ?? DBNull.Value);
-                insertAreaCommand.Parameters.AddWithValue("$change_set", relation.ChangeSet);
-                insertAreaCommand.Parameters.AddWithValue("$timestamp", relation.Timestamp?.ToString("yyyy-MM-ddTHH:mm:ssZ") as object ?? DBNull.Value);
-                insertAreaCommand.Parameters.AddWithValue("$user", relation.User as object ?? DBNull.Value);
-                insertAreaCommand.Parameters.AddWithValue("$uid", relation.Uid as object ?? DBNull.Value);
-                insertAreaCommand.Parameters.AddWithValue("$outer_coords", coords.AsString());
-                insertAreaCommand.Parameters.AddWithValue("$inner_coords", innerCoords.AsString());
-                insertAreaCommand.Parameters.AddWithValue("$name", relation.Tags.TryGetValue("name", out string? nameValue) ? nameValue : DBNull.Value);
-                insertAreaCommand.Parameters.AddWithValue("$suggested_colour", suggestedColour);
-                insertAreaCommand.Parameters.AddWithValue("$tile_id", tileId);
-                insertAreaCommand.Parameters.AddWithValue("$layer", relation.Tags.TryGetValue("layer", out string? layerValue) ? layerValue : 0);
-                insertAreaCommand.Parameters.AddWithValue("$height", heightResult.Height);
-                insertAreaCommand.Parameters.AddWithValue("$min_height", heightResult.MinHeight);
-                insertAreaCommand.Parameters.AddWithValue("$is_large", largeTileResult.IsLarge);
+                string name = relation.Tags.GetValueOrDefault("name", "");
+                int layer = 0;
+                if (int.TryParse(relation.Tags.GetValueOrDefault("layer", "0"), out int _layer))
+                {
+                    layer = _layer;
+                }
+                var relationArea = new Area
+                {
+                    Source = $"relation-{relation.Id}",
+                    Visible = relation.Visible,
+                    Version = relation.Version,
+                    ChangeSet = relation.ChangeSet,
+                    Timestamp = relation.Timestamp,
+                    User = relation.User,
+                    Uid = relation.Uid,
+                    OuterCoordinates = coords,
+                    InnerCoordinates = innerCoords,
+                    Name = name,
+                    SuggestedColour = suggestedColour,
+                    TileId = tileId,
+                    Layer = layer,
+                    Height = heightResult.Height,
+                    MinHeight = heightResult.MinHeight,
+                    IsLarge = largeTileResult.IsLarge
+                };
 
+                databaseAreas.Add(relationArea);
                 if (largeTileResult.IsLarge)
                 {
-                    insertAreaCommand.CommandText += @"
-
-                    CREATE TEMP TABLE temp_id (id INTEGER);
-                    INSERT INTO temp_id (id) VALUES (last_insert_rowid());
-
-                    $values 
-                    DROP TABLE temp_id;
-                    "
-                    // because sqlite has the dumbest rules about SQL variables
-                    .Replace("$values", String.Join("\n", largeTileResult.Tiles.Select(t => $"INSERT INTO tile_area_map(area_id, tile_id) SELECT id, {t.Id} FROM temp_id;")));
+                    largeTilesDict.Add(relationArea.Source, largeTileResult.Tiles.Select(t => t.Id).ToArray());
                 }
-                insertAreaCommand.ExecuteNonQuery();
             }
 
-            var parentedWayIds = relation.Members.Where(m => m.Type == "way").Select(m => m.Id);
-            using var wayAreaParent = connection.CreateCommand();
-            wayAreaParent.CommandText = @"
+            var parentedWayIds = relation.Members.Where(m => m.Type == "way").Select(m => m.Id).ToArray();
+            areaWayParentDict.Add(relation.Id, parentedWayIds);
+        }
+        SaveAreaBatch(databaseAreas);
+        SaveTileAreaMap(largeTilesDict);
+        SaveWayParents(areaWayParentDict);
+    }
+
+    private void SaveWayParents(Dictionary<long, long[]> relationWayMap)
+    {
+        using var connection = createConnection();
+        using var transaction = connection.BeginTransaction();
+
+        foreach (var kv in relationWayMap)
+        {
+            var relationId = kv.Key;
+            var wayIds = kv.Value;
+            using var wayAreaParentCommand = connection.CreateCommand();
+            wayAreaParentCommand.CommandText = @"
                     UPDATE way 
                     SET area_parent_id = $area_parent_id
-                    WHERE id IN($way_ids);".Replace("$way_ids", string.Join(',', parentedWayIds));
-            wayAreaParent.Parameters.AddWithValue("$area_parent_id", relation.Id);
-            wayAreaParent.ExecuteNonQuery();
+                    WHERE id IN($way_ids);".Replace("$way_ids", string.Join(',', wayIds));
+            wayAreaParentCommand.Parameters.AddWithValue("$area_parent_id", relationId);
+            wayAreaParentCommand.ExecuteNonQuery();
         }
         transaction.Commit();
     }
 
-    private void SaveAreaBatch(SqliteConnection connection, List<Way> wayBatch)
+    private void SaveAreaBatch(List<Way> wayBatch)
     {
+        var databaseAreas = new List<Area>();
+        var largeTilesDict = new Dictionary<string, long[]>();
         var wayIds = wayBatch.Select(w => w.Id).ToArray();
 
         var wayNodes = wayIds.Chunk(1000).SelectMany(chunk =>
@@ -957,8 +961,6 @@ public class SqliteStore
             var wayNodes = FetchNodesByWayIds(chunk.ToArray());
             return wayNodes;
         }).ToDictionary();
-
-        using var transaction = connection.BeginTransaction();
 
         foreach (var way in wayBatch)
         {
@@ -986,50 +988,72 @@ public class SqliteStore
             var largeTileResult = tileService.CalcLargeTileRange(orderedCoords);
             var heightResult = heightService.CalcBuildingHeight(wayTags);
 
-            var coords = orderedCoords.ToArray().AsString();
-            using var insertAreaCommand = connection.CreateCommand();
-            insertAreaCommand.Transaction = transaction;
-            insertAreaCommand.CommandText = @"
-                    INSERT INTO area (source, visible, version, change_set, timestamp, user, uid, outer_coords, inner_coords, name, suggested_colour, tile_id, layer, height, min_height, is_large)
-                        VALUES($source, $visible, $version, $change_set, $timestamp, $user, $uid, $outer_coords, $inner_coords, $name, $suggested_colour, $tile_id, $layer, $height, $min_height, $is_large);
-                    ";
-            insertAreaCommand.Parameters.AddWithValue("$source", $"way-{way.Id}");
-            insertAreaCommand.Parameters.AddWithValue("$visible", way.Visible as object ?? DBNull.Value);
-            insertAreaCommand.Parameters.AddWithValue("$version", way.Version as object ?? DBNull.Value);
-            insertAreaCommand.Parameters.AddWithValue("$change_set", way.ChangeSet);
-            insertAreaCommand.Parameters.AddWithValue("$timestamp", way.Timestamp?.ToString("yyyy-MM-ddTHH:mm:ssZ") as object ?? DBNull.Value);
-            insertAreaCommand.Parameters.AddWithValue("$user", way.User as object ?? DBNull.Value);
-            insertAreaCommand.Parameters.AddWithValue("$uid", way.Uid as object ?? DBNull.Value);
-            insertAreaCommand.Parameters.AddWithValue("$outer_coords", coords);
-            insertAreaCommand.Parameters.AddWithValue("$inner_coords", "");
-            insertAreaCommand.Parameters.AddWithValue("$name", wayTags.TryGetValue("name", out string? nameValue) ? nameValue : DBNull.Value);
-            insertAreaCommand.Parameters.AddWithValue("$suggested_colour", suggestedColour);
-            insertAreaCommand.Parameters.AddWithValue("$tile_id", tileService.CalcTileId(orderedCoords.Average(n => n.Lat), orderedCoords.Average(n => n.Lon)));
-            insertAreaCommand.Parameters.AddWithValue("$layer", wayTags.TryGetValue("layer", out string? layerValue) ? layerValue : 0);
-            insertAreaCommand.Parameters.AddWithValue("$height", heightResult.Height);
-            insertAreaCommand.Parameters.AddWithValue("$min_height", heightResult.MinHeight);
-            insertAreaCommand.Parameters.AddWithValue("$is_large", largeTileResult.IsLarge);
+            string name = wayTags.GetValueOrDefault("name", "");
+            int layer = 0;
+            if (int.TryParse(wayTags.GetValueOrDefault("layer", "0"), out int _layer))
+            {
+                layer = _layer;
+            }
+            var wayArea = new Area
+            {
+                Source = $"way-{way.Id}",
+                Visible = way.Visible,
+                Version = way.Version,
+                ChangeSet = way.ChangeSet,
+                Timestamp = way.Timestamp,
+                User = way.User,
+                Uid = way.Uid,
+                OuterCoordinates = new[] { orderedCoords.ToArray() },
+                InnerCoordinates = Array.Empty<Coord[]>(),
+                Name = name,
+                SuggestedColour = suggestedColour,
+                TileId = tileService.CalcTileId(orderedCoords.Average(n => n.Lat), orderedCoords.Average(n => n.Lon)),
+                Layer = layer,
+                Height = heightResult.Height,
+                MinHeight = heightResult.MinHeight,
+                IsLarge = largeTileResult.IsLarge
+            };
 
+            databaseAreas.Add(wayArea);
             if (largeTileResult.IsLarge)
             {
-                insertAreaCommand.CommandText += @"
+                largeTilesDict.Add(wayArea.Source, largeTileResult.Tiles.Select(t => t.Id).ToArray());
+            }
+        }
+
+        SaveAreaBatch(databaseAreas);
+        SaveTileAreaMap(largeTilesDict);
+    }
+
+    private void SaveTileAreaMap(Dictionary<string, long[]> areaTileMap)
+    {
+        using var connection = createConnection();
+        using var transaction = connection.BeginTransaction();
+        foreach (var kv in areaTileMap)
+        {
+            var areaSource = kv.Key;
+            var tileIds = kv.Value;
+            using var command = connection.CreateCommand();
+            command.Transaction = transaction;
+            command.CommandText = @"
 
                 CREATE TEMP TABLE temp_id (id INTEGER);
-                INSERT INTO temp_id (id) VALUES (last_insert_rowid());
+                INSERT INTO temp_id (id) SELECT id from area WHERE source = '$source';
 
                 $values 
                 DROP TABLE temp_id;
                 "
-                // because sqlite has the dumbest rules about SQL variables
-                .Replace("$values", String.Join("\n", largeTileResult.Tiles.Select(t => $"INSERT INTO tile_area_map(area_id, tile_id) SELECT id, {t.Id} FROM temp_id;")));
-            }
-            insertAreaCommand.ExecuteNonQuery();
+            .Replace("$source", areaSource)
+            // because sqlite has the dumbest rules about SQL variables                
+            .Replace("$values", String.Join("\n", tileIds.Select(t => $"INSERT INTO tile_area_map(area_id, tile_id) SELECT id, {t} FROM temp_id;")));
+            command.ExecuteNonQuery();
         }
         transaction.Commit();
     }
 
-    private void SaveHighwayAreaBatch(SqliteConnection connection, List<Way> wayBatch)
+    private void SaveHighwayAreaBatch(List<Way> wayBatch)
     {
+        var databaseAreas = new List<Area>();
         var wayIds = wayBatch.Select(w => w.Id).ToArray();
 
         var wayNodes = wayIds.Chunk(1000).SelectMany(chunk =>
@@ -1037,8 +1061,6 @@ public class SqliteStore
             var wayNodes = FetchNodesByWayIds(chunk.ToArray());
             return wayNodes;
         }).ToDictionary();
-
-        using var transaction = connection.BeginTransaction();
 
         foreach (var way in wayBatch)
         {
@@ -1102,33 +1124,73 @@ public class SqliteStore
             }
 
             var highwayCoords = highwayBuilderService.CalcHighwayCoordinates(orderedCoords, width)
-                //.Reverse<Coord>()
                 .ToArray();
             var tile = tileService.CalcTileId(orderedCoords.Average(n => n.Lat), orderedCoords.Average(n => n.Lon));
 
-            var coords = highwayCoords.ToArray().AsString();
+            string name = wayTags.GetValueOrDefault("name", "");
+            int layer = 0;
+            if (int.TryParse(wayTags.GetValueOrDefault("layer", "0"), out int _layer))
+            {
+                layer = _layer;
+            }
+            var highwayArea = new Area
+            {
+                Source = $"way-{way.Id}",
+                Visible = way.Visible,
+                Version = way.Version,
+                ChangeSet = way.ChangeSet,
+                Timestamp = way.Timestamp,
+                User = way.User,
+                Uid = way.Uid,
+                OuterCoordinates = new[] { highwayCoords.ToArray() },
+                InnerCoordinates = Array.Empty<Coord[]>(),
+                Name = name,
+                SuggestedColour = suggestedColour,
+                TileId = tile,
+                Layer = layer,
+                Height = 0.1,
+                MinHeight = 0.0,
+                IsLarge = false
+            };
+
+            databaseAreas.Add(highwayArea);
+        }
+
+        SaveAreaBatch(databaseAreas);
+    }
+
+    private void SaveAreaBatch(IEnumerable<Area> areaBatch)
+    {
+        using var connection = createConnection();
+        using var transaction = connection.BeginTransaction();
+
+        foreach (var area in areaBatch)
+        {
+
+            var outerCoords = area.OuterCoordinates.AsString();
+            var innerCoords = area.InnerCoordinates.AsString();
             using var insertAreaCommand = connection.CreateCommand();
             insertAreaCommand.Transaction = transaction;
             insertAreaCommand.CommandText = @"
                     INSERT INTO area (source, visible, version, change_set, timestamp, user, uid, outer_coords, inner_coords, name, suggested_colour, tile_id, layer, height, min_height, is_large)
                         VALUES($source, $visible, $version, $change_set, $timestamp, $user, $uid, $outer_coords, $inner_coords, $name, $suggested_colour, $tile_id, $layer, $height, $min_height, $is_large);
                     ";
-            insertAreaCommand.Parameters.AddWithValue("$source", $"way-{way.Id}");
-            insertAreaCommand.Parameters.AddWithValue("$visible", way.Visible as object ?? DBNull.Value);
-            insertAreaCommand.Parameters.AddWithValue("$version", way.Version as object ?? DBNull.Value);
-            insertAreaCommand.Parameters.AddWithValue("$change_set", way.ChangeSet);
-            insertAreaCommand.Parameters.AddWithValue("$timestamp", way.Timestamp?.ToString("yyyy-MM-ddTHH:mm:ssZ") as object ?? DBNull.Value);
-            insertAreaCommand.Parameters.AddWithValue("$user", way.User as object ?? DBNull.Value);
-            insertAreaCommand.Parameters.AddWithValue("$uid", way.Uid as object ?? DBNull.Value);
-            insertAreaCommand.Parameters.AddWithValue("$outer_coords", coords);
-            insertAreaCommand.Parameters.AddWithValue("$inner_coords", "");
-            insertAreaCommand.Parameters.AddWithValue("$name", wayTags.TryGetValue("name", out string? nameValue) ? nameValue : DBNull.Value);
-            insertAreaCommand.Parameters.AddWithValue("$suggested_colour", suggestedColour);
-            insertAreaCommand.Parameters.AddWithValue("$tile_id", tile);
-            insertAreaCommand.Parameters.AddWithValue("$layer", wayTags.TryGetValue("layer", out string? layerValue) ? layerValue : 0);
-            insertAreaCommand.Parameters.AddWithValue("$height", 0.1);
-            insertAreaCommand.Parameters.AddWithValue("$min_height", 0.0);
-            insertAreaCommand.Parameters.AddWithValue("$is_large", false);
+            insertAreaCommand.Parameters.AddWithValue("$source", area.Source);
+            insertAreaCommand.Parameters.AddWithValue("$visible", area.Visible as object ?? DBNull.Value);
+            insertAreaCommand.Parameters.AddWithValue("$version", area.Version as object ?? DBNull.Value);
+            insertAreaCommand.Parameters.AddWithValue("$change_set", area.ChangeSet);
+            insertAreaCommand.Parameters.AddWithValue("$timestamp", area.Timestamp?.ToString("yyyy-MM-ddTHH:mm:ssZ") as object ?? DBNull.Value);
+            insertAreaCommand.Parameters.AddWithValue("$user", area.User as object ?? DBNull.Value);
+            insertAreaCommand.Parameters.AddWithValue("$uid", area.Uid as object ?? DBNull.Value);
+            insertAreaCommand.Parameters.AddWithValue("$outer_coords", outerCoords);
+            insertAreaCommand.Parameters.AddWithValue("$inner_coords", innerCoords);
+            insertAreaCommand.Parameters.AddWithValue("$name", area.Name as object ?? DBNull.Value);
+            insertAreaCommand.Parameters.AddWithValue("$suggested_colour", area.SuggestedColour);
+            insertAreaCommand.Parameters.AddWithValue("$tile_id", area.TileId);
+            insertAreaCommand.Parameters.AddWithValue("$layer", area.Layer);
+            insertAreaCommand.Parameters.AddWithValue("$height", area.Height);
+            insertAreaCommand.Parameters.AddWithValue("$min_height", area.MinHeight);
+            insertAreaCommand.Parameters.AddWithValue("$is_large", area.IsLarge);
 
             insertAreaCommand.ExecuteNonQuery();
         }

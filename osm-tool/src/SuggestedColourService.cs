@@ -1,28 +1,29 @@
-using System.Data;
 using System.Drawing;
-using Microsoft.Data.Sqlite;
-using OsmTool.Models;
+using System.Windows.Markup;
 
 namespace OsmTool;
-
 
 public class SuggestedColourService
 {
     public string CalcSuggestedColour(Dictionary<string, string> tags)
     {
-        foreach (var (k, v) in tags)
-        {
-            if (k.Contains("note"))
-            {
-                Console.WriteLine($"'{k}' -> '{v}'");
-            }
-        }
-
         if (tags.TryGetValue("building:colour", out string? buildingColour))
         {
             if (buildingColour.StartsWith("#"))
             {
                 return buildingColour;
+            }
+            switch (buildingColour)
+            {
+                case "grey":
+                    return "#808080";
+                case "lightgrey":
+                    return "#d3d3d3";
+                case "light_brown":
+                case "lightbrown":
+                    return "#deb887";
+                case "darkbrown":
+                    return "#8b4513";
             }
             var knownColour = Color.FromName(buildingColour);
             if (knownColour.ToArgb() != 0)

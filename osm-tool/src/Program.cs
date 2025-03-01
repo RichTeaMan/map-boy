@@ -10,7 +10,8 @@ public class Program
         {
             datafile = args[0];
         }
-        else {
+        else
+        {
             Console.WriteLine("Datafile not specified.");
         }
         Console.WriteLine($"Datafile: {datafile}");
@@ -31,25 +32,15 @@ public class Program
                 Uri = datafile
             };
         }
-        else {
+        else
+        {
             Console.WriteLine("Unknown file format");
             return;
         }
         string dbPath = (datafile + ".db").Split("/").Last();
         File.Delete(dbPath);
-        Console.WriteLine("Building database...");
-        var store = new SqliteStore(dbPath);
-
-        Console.WriteLine("Saving nodes...");
-        store.SaveNodes(reader);
-        Console.WriteLine("Saving ways...");
-        store.SaveWays(reader);
-        
-        Console.WriteLine("Saving multipolygon relations...");
-        store.SaveAreas(reader);
-
-        Console.WriteLine("Building search index...");
-        store.BuildSearchIndex();
+        var service = new OsmService(new SqliteStore(dbPath));
+        service.BuildDatabase(reader);
 
         var endTime = DateTimeOffset.Now;
         var duration = endTime - startTime;

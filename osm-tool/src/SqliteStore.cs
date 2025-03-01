@@ -1,5 +1,4 @@
 using System.Data;
-using System.Linq;
 using Microsoft.Data.Sqlite;
 using OsmTool.Models;
 
@@ -8,10 +7,6 @@ namespace OsmTool;
 public class SqliteStore
 {
     private readonly TileService tileService = new TileService();
-
-    private readonly BuildingHeightService heightService = new BuildingHeightService();
-
-    private readonly HighwayBuilderService highwayBuilderService = new HighwayBuilderService();
 
     private string FilePath { get; init; }
 

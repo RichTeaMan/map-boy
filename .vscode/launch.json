@@ -1,0 +1,21 @@
+{
+    // because MS is a joke
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+     {
+            "name": "OSM tool",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "${workspaceFolder}/osm-tool/bin/Debug/net9.0/osm-tool.dll",
+            //"args": ["${workspaceFolder}/greater-london.osm.pbf"],
+            "args": ["${workspaceFolder}/osm-tool/datasets/westminster.osm"],
+            "cwd": "${workspaceFolder}",
+            "stopAtEntry": false,
+            "console": "internalConsole"
+        },
+    ],
+}

@@ -1,5 +1,5 @@
 using System.Data;
-using System.Drawing;
+using System.Linq;
 using Microsoft.Data.Sqlite;
 using OsmTool.Models;
 
@@ -109,32 +109,35 @@ public class SqliteStore
         createTableCommand.ExecuteNonQuery();
     }
 
-    public void SaveNodeBatch(List<OsmNode> nodeBatch)
+    public void SaveNodeBatch(IEnumerable<OsmNode> nodes)
     {
-        using var connection = createConnection();
-        using var transaction = connection.BeginTransaction();
-        foreach (var node in nodeBatch)
+        foreach (var nodeBatch in nodes.Chunk(1000))
         {
-            using var insertNodeCommand = connection.CreateCommand();
-            insertNodeCommand.Transaction = transaction;
-            insertNodeCommand.CommandText = @"
+            using var connection = createConnection();
+            using var transaction = connection.BeginTransaction();
+            foreach (var node in nodeBatch)
+            {
+                using var insertNodeCommand = connection.CreateCommand();
+                insertNodeCommand.Transaction = transaction;
+                insertNodeCommand.CommandText = @"
                 INSERT INTO node (id, visible, version, change_set, timestamp, user, uid, lat, lon, tile_id, layer)
                     VALUES($id, $visible, $version, $change_set, $timestamp, $user, $uid, $lat, $lon, $tile_id, $layer);
                 ";
-            insertNodeCommand.Parameters.AddWithValue("$id", node.Id);
-            insertNodeCommand.Parameters.AddWithValue("$visible", node.Visible as object ?? DBNull.Value);
-            insertNodeCommand.Parameters.AddWithValue("$version", node.Version as object ?? DBNull.Value);
-            insertNodeCommand.Parameters.AddWithValue("$change_set", node.ChangeSet as object ?? DBNull.Value);
-            insertNodeCommand.Parameters.AddWithValue("$timestamp", node.Timestamp?.ToString("yyyy-MM-ddTHH:mm:ssZ") as object ?? DBNull.Value);
-            insertNodeCommand.Parameters.AddWithValue("$user", node.User as object ?? DBNull.Value);
-            insertNodeCommand.Parameters.AddWithValue("$uid", node.Uid as object ?? DBNull.Value);
-            insertNodeCommand.Parameters.AddWithValue("$lat", node.Lat);
-            insertNodeCommand.Parameters.AddWithValue("$lon", node.Lon);
-            insertNodeCommand.Parameters.AddWithValue("$tile_id", tileService.CalcTileId(node.Lat, node.Lon));
-            insertNodeCommand.Parameters.AddWithValue("$layer", node.Tags.TryGetValue("layer", out string? value) ? value : 0);
-            insertNodeCommand.ExecuteNonQuery();
+                insertNodeCommand.Parameters.AddWithValue("$id", node.Id);
+                insertNodeCommand.Parameters.AddWithValue("$visible", node.Visible as object ?? DBNull.Value);
+                insertNodeCommand.Parameters.AddWithValue("$version", node.Version as object ?? DBNull.Value);
+                insertNodeCommand.Parameters.AddWithValue("$change_set", node.ChangeSet as object ?? DBNull.Value);
+                insertNodeCommand.Parameters.AddWithValue("$timestamp", node.Timestamp?.ToString("yyyy-MM-ddTHH:mm:ssZ") as object ?? DBNull.Value);
+                insertNodeCommand.Parameters.AddWithValue("$user", node.User as object ?? DBNull.Value);
+                insertNodeCommand.Parameters.AddWithValue("$uid", node.Uid as object ?? DBNull.Value);
+                insertNodeCommand.Parameters.AddWithValue("$lat", node.Lat);
+                insertNodeCommand.Parameters.AddWithValue("$lon", node.Lon);
+                insertNodeCommand.Parameters.AddWithValue("$tile_id", tileService.CalcTileId(node.Lat, node.Lon));
+                insertNodeCommand.Parameters.AddWithValue("$layer", node.Tags.TryGetValue("layer", out string? value) ? value : 0);
+                insertNodeCommand.ExecuteNonQuery();
+            }
+            transaction.Commit();
         }
-        transaction.Commit();
     }
 
     public Dictionary<long, OsmNode> FetchNodesByIds(long[] ids)
@@ -168,60 +171,63 @@ public class SqliteStore
         return result;
     }
 
-    public void SaveWayBatch(List<OsmWay> wayBatch)
+    public void SaveWayBatch(IEnumerable<OsmWay> ways)
     {
-        using var connection = createConnection();
-        var nodeIds = wayBatch.SelectMany(w => w.NodeReferences).Distinct().ToArray();
-        var nodes = FetchNodesByIds(nodeIds);
-        using var transaction = connection.BeginTransaction();
-        int noCoord = 0;
-        int wayTotal = 0;
-        foreach (var way in wayBatch)
+        foreach (var wayBatch in ways.Chunk(1000))
         {
-            var wayNodes = way.NodeReferences.Select(id => nodes[id]).ToArray();
-            if (way.NodeReferences.Count == 0)
+            using var connection = createConnection();
+            var nodeIds = wayBatch.SelectMany(w => w.NodeReferences).Distinct().ToArray();
+            var nodes = FetchNodesByIds(nodeIds);
+            using var transaction = connection.BeginTransaction();
+            int noCoord = 0;
+            int wayTotal = 0;
+            foreach (var way in wayBatch)
             {
-                noCoord++;
-            }
-            bool closedLoop = way!.Tags!.GetValueOrDefault("area", null) == "yes"
-                || nodes[way.NodeReferences.First()].LocationEquals(nodes[way.NodeReferences.Last()])
-                && !way.Tags.ContainsKey("highway")
-                && !way.Tags.ContainsKey("barrier");
-            // ??? && !way.Tags.ContainsKey("waterway");
+                var wayNodes = way.NodeReferences.Select(id => nodes[id]).ToArray();
+                if (way.NodeReferences.Count == 0)
+                {
+                    noCoord++;
+                }
+                bool closedLoop = way!.Tags!.GetValueOrDefault("area", null) == "yes"
+                    || nodes[way.NodeReferences.First()].LocationEquals(nodes[way.NodeReferences.Last()])
+                    && !way.Tags.ContainsKey("highway")
+                    && !way.Tags.ContainsKey("barrier");
+                // ??? && !way.Tags.ContainsKey("waterway");
 
-            wayTotal++;
+                wayTotal++;
 
-            using var insertWayCommand = connection.CreateCommand();
-            insertWayCommand.Transaction = transaction;
-            insertWayCommand.CommandText = @"
+                using var insertWayCommand = connection.CreateCommand();
+                insertWayCommand.Transaction = transaction;
+                insertWayCommand.CommandText = @"
                 INSERT INTO way (id, visible, version, change_set, timestamp, user, uid, closed_loop, tags)
                     VALUES($id, $visible, $version, $change_set, $timestamp, $user, $uid, $closed_loop, $tags);
                 ";
-            insertWayCommand.Parameters.AddWithValue("$id", way.Id);
-            insertWayCommand.Parameters.AddWithValue("$visible", way.Visible as object ?? DBNull.Value);
-            insertWayCommand.Parameters.AddWithValue("$version", way.Version as object ?? DBNull.Value);
-            insertWayCommand.Parameters.AddWithValue("$change_set", way.ChangeSet);
-            insertWayCommand.Parameters.AddWithValue("$timestamp", way.Timestamp?.ToString("yyyy-MM-ddTHH:mm:ssZ") as object ?? DBNull.Value);
-            insertWayCommand.Parameters.AddWithValue("$user", way.User as object ?? DBNull.Value);
-            insertWayCommand.Parameters.AddWithValue("$uid", way.Uid as object ?? DBNull.Value);
-            insertWayCommand.Parameters.AddWithValue("$closed_loop", closedLoop);
-            insertWayCommand.Parameters.AddWithValue("$tags", DictUtils.DictToString(way.Tags));
-            insertWayCommand.ExecuteNonQuery();
+                insertWayCommand.Parameters.AddWithValue("$id", way.Id);
+                insertWayCommand.Parameters.AddWithValue("$visible", way.Visible as object ?? DBNull.Value);
+                insertWayCommand.Parameters.AddWithValue("$version", way.Version as object ?? DBNull.Value);
+                insertWayCommand.Parameters.AddWithValue("$change_set", way.ChangeSet);
+                insertWayCommand.Parameters.AddWithValue("$timestamp", way.Timestamp?.ToString("yyyy-MM-ddTHH:mm:ssZ") as object ?? DBNull.Value);
+                insertWayCommand.Parameters.AddWithValue("$user", way.User as object ?? DBNull.Value);
+                insertWayCommand.Parameters.AddWithValue("$uid", way.Uid as object ?? DBNull.Value);
+                insertWayCommand.Parameters.AddWithValue("$closed_loop", closedLoop);
+                insertWayCommand.Parameters.AddWithValue("$tags", DictUtils.DictToString(way.Tags));
+                insertWayCommand.ExecuteNonQuery();
 
-            foreach (var node in wayNodes.Select((e, i) => new { e.Id, ordinal = i }))
-            {
-                using var insertWayNodeCommand = connection.CreateCommand();
-                insertWayNodeCommand.CommandText = @"
+                foreach (var node in wayNodes.Select((e, i) => new { e.Id, ordinal = i }))
+                {
+                    using var insertWayNodeCommand = connection.CreateCommand();
+                    insertWayNodeCommand.CommandText = @"
                     INSERT INTO way_node_map (way_id, node_id, ordinal)
                         VALUES($way_id, $node_id, $ordinal);
                     ";
-                insertWayNodeCommand.Parameters.AddWithValue("$way_id", way.Id);
-                insertWayNodeCommand.Parameters.AddWithValue("$node_id", node.Id);
-                insertWayNodeCommand.Parameters.AddWithValue("$ordinal", node.ordinal);
-                insertWayNodeCommand.ExecuteNonQuery();
+                    insertWayNodeCommand.Parameters.AddWithValue("$way_id", way.Id);
+                    insertWayNodeCommand.Parameters.AddWithValue("$node_id", node.Id);
+                    insertWayNodeCommand.Parameters.AddWithValue("$ordinal", node.ordinal);
+                    insertWayNodeCommand.ExecuteNonQuery();
+                }
             }
+            transaction.Commit();
         }
-        transaction.Commit();
     }
 
     public IEnumerable<Way> FetchWays(long[]? ids = null, long[]? tileIds = null)
@@ -356,7 +362,6 @@ public class SqliteStore
 
         foreach (var area in areaBatch)
         {
-
             var outerCoords = area.OuterCoordinates.AsString();
             var innerCoords = area.InnerCoordinates.AsString();
             using var insertAreaCommand = connection.CreateCommand();

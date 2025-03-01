@@ -160,11 +160,14 @@ public class OsmService
 
             foreach (var relation in relationBatch)
             {
+                areaWayParentDict.Add(relation.Id, relation.Members.Where(m => m.Type == "way").Select(m => m.Id).ToArray());
+
                 var innerWayIds = relation.Members.Where(m => m.Role == "inner" && m.Type == "way").Select(m => m.Id);
                 // bravely ignoring inner polygons that are not closed
                 var innerWays = innerWayIds.Select(w => waysDict.GetValueOrDefault(w)!).Where(w => w != null && w.ClosedLoop).ToArray();
 
-                var outerWayIds = relation.Members.Where(m => m.Role == "outer" && m.Type == "way").Select(m => m.Id);
+                // empty role is implied outer?
+                var outerWayIds = relation.Members.Where(m => (m.Role == "outer" || m.Role == "") && m.Type == "way").Select(m => m.Id);
                 var outerWaysWithNulls = outerWayIds.Select(w => waysDict.GetValueOrDefault(w)!).ToArray();
                 var outerWays = outerWaysWithNulls.Where(w => w != null).ToArray();
                 if (outerWays.Length == 0)
@@ -264,7 +267,7 @@ public class OsmService
                 {
                     Console.WriteLine($"Relation {relation.Id} has an unknown colour, skipping.");
                 }
-                else if (suggestedColour != "no-colour")
+                else if (suggestedColour != SuggestedColourService.NO_COLOUR)
                 {
                     var coords = loopCoords.ToArray();
                     var innerCoords = innerWays.Select(w => Coord.FromNodes(wayNodes[w.Id])).ToArray();
@@ -304,9 +307,6 @@ public class OsmService
                         largeTilesDict.Add(relationArea.Source, largeTileResult.Tiles.Select(t => t.Id).ToArray());
                     }
                 }
-
-                var parentedWayIds = relation.Members.Where(m => m.Type == "way").Select(m => m.Id).ToArray();
-                areaWayParentDict.Add(relation.Id, parentedWayIds);
             }
             sqliteStore.SaveAreaBatch(databaseAreas);
             sqliteStore.SaveTileAreaMap(largeTilesDict);
@@ -341,12 +341,12 @@ public class OsmService
                 var wayTags = way.TagsToDict();
 
                 string suggestedColour = suggestedColourService.CalcSuggestedColour(wayTags);
-                if (suggestedColour == "unknown")
+                if (suggestedColour == SuggestedColourService.UNKNOWN_COLOUR)
                 {
                     Console.WriteLine($"Way {way.Id} has an unknown colour, skipping.");
                     continue;
                 }
-                else if (suggestedColour == "no-colour")
+                else if (suggestedColour == SuggestedColourService.NO_COLOUR)
                 {
                     continue;
                 }
@@ -456,12 +456,12 @@ public class OsmService
                 }
 
                 string suggestedColour = suggestedColourService.CalcSuggestedColour(wayTags);
-                if (suggestedColour == "unknown")
+                if (suggestedColour == SuggestedColourService.UNKNOWN_COLOUR)
                 {
                     Console.WriteLine($"Way {way.Id} has an unknown colour, skipping.");
                     continue;
                 }
-                else if (suggestedColour == "no-colour")
+                else if (suggestedColour == SuggestedColourService.NO_COLOUR)
                 {
                     continue;
                 }

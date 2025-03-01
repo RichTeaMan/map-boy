@@ -1,3 +1,5 @@
+using System.Net.WebSockets;
+
 namespace OsmTool;
 
 public static class DictUtils
@@ -29,7 +31,8 @@ public static class DictUtils
                     break;
                 }
             }
-            if (!hasSeparator) {
+            if (!hasSeparator)
+            {
                 separator = sep;
                 break;
             }
@@ -65,5 +68,19 @@ public static class DictUtils
         }
 
         return dict;
+    }
+
+    public static bool TryGetValueFromKeys<K, V>(this Dictionary<K, V> dict, IEnumerable<K> keys, out V? value) where K : notnull
+    {
+        foreach (var k in keys)
+        {
+            if (dict.TryGetValue(k, out V? kValue))
+            {
+                value = kValue;
+                return true;
+            }
+        }
+        value = default;
+        return false;
     }
 }

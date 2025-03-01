@@ -523,23 +523,14 @@ public class SqliteStore
         }
         commit();
     }
-
-    public class SearchIndexResult
-    {
-        public required string Name { get; set; }
-        public double Lat { get; set; }
-        public double Lon { get; set; }
-    }
-
+    
     public IEnumerable<SearchIndexResult> SearchAreas(string searchTerm)
     {
         using var connection = createConnection();
         connection.Open();
 
         using var command = connection.CreateCommand();
-        command.CommandText = @"
-            SELECT name, lat, lon FROM search_index WHERE name LIKE $name;
-        ";//.Replace("$name", searchTerm);
+        command.CommandText = "SELECT name, lat, lon FROM search_index WHERE name LIKE $name;";
         command.Parameters.AddWithValue("$name", $"%{searchTerm}%");
 
         using var reader = command.ExecuteReader();
@@ -549,7 +540,8 @@ public class SqliteStore
             {
                 Name = reader.GetString("name"),
                 Lat = reader.GetDouble("lat"),
-                Lon = reader.GetDouble("lon")
+                Lon = reader.GetDouble("lon"),
+                Rank = 0.5
             };
         }
     }

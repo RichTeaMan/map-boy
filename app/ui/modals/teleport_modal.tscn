@@ -22,16 +22,23 @@ layout_mode = 2
 unique_name_in_owner = true
 layout_mode = 2
 
+[node name="ScrollContainer" type="ScrollContainer" parent="MarginContainer/VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="result_rows" type="VBoxContainer" parent="MarginContainer/VBoxContainer/ScrollContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+
 [node name="HBoxContainer" type="HBoxContainer" parent="MarginContainer/VBoxContainer"]
 custom_minimum_size = Vector2(4, 0)
 layout_mode = 2
-
-[node name="btn_teleport" type="Button" parent="MarginContainer/VBoxContainer/HBoxContainer"]
-unique_name_in_owner = true
-layout_mode = 2
-text = "Teleport"
 
 [node name="btn_cancel" type="Button" parent="MarginContainer/VBoxContainer/HBoxContainer"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Cancel"
+
+[node name="http_request" type="HTTPRequest" parent="."]
+unique_name_in_owner = true

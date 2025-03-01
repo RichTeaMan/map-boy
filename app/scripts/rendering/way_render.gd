@@ -37,6 +37,8 @@ static func fetch_material(colour: String):
                 material.albedo_color = Color.LIGHT_GREEN
             "dark-green":
                 material.albedo_color = Color.OLIVE_DRAB
+            "light-green":
+                material.albedo_color = Color.PALE_GREEN
             "grey":
                 material.albedo_color = Color.GRAY
             "light-grey":

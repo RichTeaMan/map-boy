@@ -32,7 +32,13 @@ public class Program
             long[]? tileIds = null;
             if (httpContext.Request.Query.TryGetValue("tileId", out var tileIdStr))
             {
-                tileIds = new[] { long.Parse(tileIdStr) };
+                tileIds = new[] { long.Parse(tileIdStr.ToString()) };
+            }
+            if (tileIds == null)
+            {
+                httpContext.Response.StatusCode = 400;
+                await httpContext.Response.WriteAsJsonAsync(new { message = "tileId must be provided." });
+                return;
             }
             var areas = store.FetchAreas(null, tileIds)
                 //.Where(a => a.SuggestedColour != "white")
@@ -54,7 +60,7 @@ public class Program
             long[]? areaIds = null;
             if (httpContext.Request.Query.TryGetValue("ids", out var idsStr))
             {
-                areaIds = idsStr.Select(id => long.Parse(id)).ToArray();
+                areaIds = idsStr.Select(id => long.Parse(idsStr.ToString())).ToArray();
             }
             var areas = store.FetchAreas(areaIds).ToArray();
             await httpContext.Response.WriteAsJsonAsync(areas);
@@ -75,9 +81,10 @@ public class Program
         })
         .WithName("GetTileIdRange");
 
-        app.MapGet("/search/{searchTerm}", (string searchTerm) => {
+        app.MapGet("/search/{searchTerm}", (string searchTerm) =>
+        {
             var store = createSqliteStore();
-            return store.SearchAreas(searchTerm).ToArray();
+            return store.SearchAreas(searchTerm).Take(20).ToArray();
         })
         .WithName("SearchAreas");
 

@@ -1,4 +1,5 @@
 using System.Data;
+using System.Threading.Tasks;
 using OsmTool.Models;
 
 namespace OsmTool;
@@ -100,18 +101,18 @@ public class OsmService
         this.locationSearch = locationSearch;
     }
 
-    public void BuildDatabase(IReader reader)
+    public async Task BuildDatabase(IReader reader)
     {
         Console.WriteLine("Building database...");
-        sqliteStore.InitDataStore();
+        await sqliteStore.InitDataStore();
 
         Console.WriteLine("Saving nodes...");
-        SaveNodes(reader);
+        await SaveNodes(reader);
         Console.WriteLine("Saving ways...");
-        SaveWays(reader);
+        await SaveWays(reader);
 
         Console.WriteLine("Saving multipolygon relations...");
-        SaveAreas(reader);
+        await SaveAreas(reader);
 
         Console.WriteLine("Building search index...");
         BuildSearchIndex();
@@ -129,34 +130,34 @@ public class OsmService
             var coord = area?.OuterCoordinates?.FirstOrDefault()?.FirstOrDefault()!;
             return new SearchIndexEntry { Name = areaName, Lat = coord.Lat, Lon = coord.Lon };
         });
-        locationSearch.UpdateIndex(searchIndexEntries);
+        locationSearch.UpdateIndex(searchIndexEntries.ToEnumerable());
     }
 
-    public void SaveNodes(IReader reader)
+    public async Task SaveNodes(IReader reader)
     {
         var nodes = reader.IterateNodes();
-        sqliteStore.SaveNodeBatch(nodes);
+        await sqliteStore.SaveNodeBatch(nodes);
     }
 
-    public void SaveWays(IReader reader)
+    public async Task SaveWays(IReader reader)
     {
         var ways = reader.IterateWays();
-        sqliteStore.SaveWayBatch(ways);
+        await sqliteStore.SaveWayBatch(ways);
     }
 
-    public void SaveAreas(IReader reader)
+    public async Task SaveAreas(IReader reader)
     {
         Console.WriteLine("Writing multi-polygon areas.");
-        SaveRelationAreas(reader.IterateRelations().Where(r => r.Tags.Any(t => t.Key == "type" && t.Value == "multipolygon")));
+        await SaveRelationAreas(reader.IterateRelations().Where(r => r.Tags.Any(t => t.Key == "type" && t.Value == "multipolygon")));
 
         Console.WriteLine("Writing single polygon areas.");
-        SaveAreaBatch(sqliteStore.FetchWays().Where(w => w.AreaParentId == null && w.ClosedLoop));
+        await SaveAreaBatch(sqliteStore.FetchWays().Where(w => w.AreaParentId == null && w.ClosedLoop).ToEnumerable());
 
         Console.WriteLine("Writing highways.");
-        SaveHighwayAreaBatch(sqliteStore.FetchWays().Where(w => !w.ClosedLoop));
+        await SaveHighwayAreaBatch(sqliteStore.FetchWays().Where(w => !w.ClosedLoop).ToEnumerable());
     }
 
-    private void SaveRelationAreas(IEnumerable<OsmRelation> relations)
+    private async Task SaveRelationAreas(IEnumerable<OsmRelation> relations)
     {
         foreach (var relationBatch in relations.Chunk(1000))
         {
@@ -165,16 +166,20 @@ public class OsmService
             var areaWayParentDict = new Dictionary<long, long[]>();
             var wayIds = relationBatch.SelectMany(r => r.Members).Where(m => m.Type == "way").Select(m => m.Id).Distinct();
 
-            var waysDict = wayIds.Chunk(1000).SelectMany(chunk =>
+            var waysDict = wayIds.Chunk(1000).Select(async chunk =>
             {
-                var ways = sqliteStore.FetchWays(chunk.ToArray());
+                var ways = await sqliteStore.FetchWays(chunk.ToArray()).ToArrayAsync();
                 return ways;
-            }).ToDictionary(k => k.Id, v => v);
-            var wayNodes = wayIds.Chunk(1000).SelectMany(chunk =>
+            })
+            .SelectMany(c => c.Result)
+            .ToDictionary(k => k.Id, v => v);
+            var wayNodes = wayIds.Chunk(1000).Select(async chunk =>
             {
-                var wayNodes = sqliteStore.FetchNodesByWayIds(chunk.ToArray());
+                var wayNodes = await sqliteStore.FetchNodesByWayIds(chunk.ToArray());
                 return wayNodes;
-            }).ToDictionary();
+            })
+            .SelectMany(c => c.Result)
+            .ToDictionary();
 
             foreach (var relation in relationBatch)
             {
@@ -326,13 +331,13 @@ public class OsmService
                     }
                 }
             }
-            sqliteStore.SaveAreaBatch(databaseAreas);
-            sqliteStore.SaveTileAreaMap(largeTilesDict);
-            sqliteStore.SaveWayParents(areaWayParentDict);
+            await sqliteStore.SaveAreaBatch(databaseAreas);
+            await sqliteStore.SaveTileAreaMap(largeTilesDict);
+            await sqliteStore.SaveWayParents(areaWayParentDict);
         }
     }
 
-    private void SaveAreaBatch(IEnumerable<Way> ways)
+    private async Task SaveAreaBatch(IEnumerable<Way> ways)
     {
         foreach (var wayBatch in ways.Chunk(1000))
         {
@@ -340,11 +345,13 @@ public class OsmService
             var largeTilesDict = new Dictionary<string, long[]>();
             var wayIds = wayBatch.Select(w => w.Id).ToArray();
 
-            var wayNodes = wayIds.Chunk(1000).SelectMany(chunk =>
+            var wayNodes = wayIds.Chunk(1000).Select(async chunk =>
             {
-                var wayNodes = sqliteStore.FetchNodesByWayIds(chunk.ToArray());
+                var wayNodes = await sqliteStore.FetchNodesByWayIds(chunk.ToArray());
                 return wayNodes;
-            }).ToDictionary();
+            })
+            .SelectMany(c => c.Result)
+            .ToDictionary();
 
             foreach (var way in wayBatch)
             {
@@ -405,23 +412,25 @@ public class OsmService
                 }
             }
 
-            sqliteStore.SaveAreaBatch(databaseAreas);
-            sqliteStore.SaveTileAreaMap(largeTilesDict);
+            await sqliteStore.SaveAreaBatch(databaseAreas);
+            await sqliteStore.SaveTileAreaMap(largeTilesDict);
         }
     }
 
-    private void SaveHighwayAreaBatch(IEnumerable<Way> ways)
+    private async Task SaveHighwayAreaBatch(IEnumerable<Way> ways)
     {
         foreach (var wayBatch in ways.Chunk(1000))
         {
             var databaseAreas = new List<Area>();
             var wayIds = wayBatch.Select(w => w.Id).ToArray();
 
-            var wayNodes = wayIds.Chunk(1000).SelectMany(chunk =>
+            var wayNodes = wayIds.Chunk(1000).Select(async chunk =>
             {
-                var wayNodes = sqliteStore.FetchNodesByWayIds(chunk.ToArray());
+                var wayNodes = await sqliteStore.FetchNodesByWayIds(chunk.ToArray());
                 return wayNodes;
-            }).ToDictionary();
+            })
+            .SelectMany(c => c.Result)
+            .ToDictionary();
 
             foreach (var way in wayBatch)
             {
@@ -517,7 +526,7 @@ public class OsmService
                 databaseAreas.Add(highwayArea);
             }
 
-            sqliteStore.SaveAreaBatch(databaseAreas);
+            await sqliteStore.SaveAreaBatch(databaseAreas);
         }
     }
 }

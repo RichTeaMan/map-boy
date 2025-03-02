@@ -51,10 +51,10 @@ public class Program
                 await httpContext.Response.WriteAsJsonAsync(new { message = "tileId must be provided." });
                 return;
             }
-            var areas = store.FetchAreas(null, tileIds)
+            var areas = await store.FetchAreas(null, tileIds)
                 .Where(a => !a.IsLarge)
-                .ToArray();
-            var areaTileIds = store.FetchAreaIdsByTileIds(tileIds).ToArray();
+                .ToArrayAsync();
+            var areaTileIds = await store.FetchAreaIdsByTileIds(tileIds).ToArrayAsync();
             var container = new AreaContainer
             {
                 Areas = areas,
@@ -72,7 +72,7 @@ public class Program
             {
                 areaIds = idsStr.Select(id => long.Parse(idsStr.ToString())).ToArray();
             }
-            var areas = store.FetchAreas(areaIds).ToArray();
+            var areas = await store.FetchAreas(areaIds).ToArrayAsync();
             await httpContext.Response.WriteAsJsonAsync(areas);
         })
         .WithName("GetAreaByIds");

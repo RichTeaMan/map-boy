@@ -1,4 +1,5 @@
 using System.Data;
+using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 using OsmTool.Models;
 
@@ -29,7 +30,7 @@ public class SqliteStore : ILocationSearch
         return connection;
     }
 
-    public void InitDataStore()
+    public async Task InitDataStore()
     {
         using var connection = createConnection();
         connection.Open();
@@ -101,10 +102,10 @@ public class SqliteStore : ILocationSearch
         CREATE INDEX idx_tile_area_map_tile_id ON tile_area_map (tile_id);
         ";
 
-        createTableCommand.ExecuteNonQuery();
+        await createTableCommand.ExecuteNonQueryAsync();
     }
 
-    public void SaveNodeBatch(IEnumerable<OsmNode> nodes)
+    public async Task SaveNodeBatch(IEnumerable<OsmNode> nodes)
     {
         foreach (var nodeBatch in nodes.Chunk(1000))
         {
@@ -129,13 +130,13 @@ public class SqliteStore : ILocationSearch
                 insertNodeCommand.Parameters.AddWithValue("$lon", node.Lon);
                 insertNodeCommand.Parameters.AddWithValue("$tile_id", tileService.CalcTileId(node.Lat, node.Lon));
                 insertNodeCommand.Parameters.AddWithValue("$layer", node.Tags.TryGetValue("layer", out string? value) ? value : 0);
-                insertNodeCommand.ExecuteNonQuery();
+                await insertNodeCommand.ExecuteNonQueryAsync();
             }
-            transaction.Commit();
+            await transaction.CommitAsync();
         }
     }
 
-    public Dictionary<long, OsmNode> FetchNodesByIds(long[] ids)
+    public async Task<Dictionary<long, OsmNode>> FetchNodesByIds(long[] ids)
     {
         var result = new Dictionary<long, OsmNode>();
         using var connection = createConnection();
@@ -146,8 +147,8 @@ public class SqliteStore : ILocationSearch
         // I gave up making this parametered. nothing works
         command.CommandText = @"SELECT id, visible, version, change_set, timestamp, user, uid, lat, lon FROM node WHERE id IN ($ids);".Replace("$ids", q);
 
-        using var reader = command.ExecuteReader();
-        while (reader.Read())
+        using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
         {
             var node = new OsmNode
             {
@@ -166,13 +167,13 @@ public class SqliteStore : ILocationSearch
         return result;
     }
 
-    public void SaveWayBatch(IEnumerable<OsmWay> ways)
+    public async Task SaveWayBatch(IEnumerable<OsmWay> ways)
     {
         foreach (var wayBatch in ways.Chunk(1000))
         {
             using var connection = createConnection();
             var nodeIds = wayBatch.SelectMany(w => w.NodeReferences).Distinct().ToArray();
-            var nodes = FetchNodesByIds(nodeIds);
+            var nodes = await FetchNodesByIds(nodeIds);
             using var transaction = connection.BeginTransaction();
             int noCoord = 0;
             int wayTotal = 0;
@@ -206,7 +207,7 @@ public class SqliteStore : ILocationSearch
                 insertWayCommand.Parameters.AddWithValue("$uid", way.Uid as object ?? DBNull.Value);
                 insertWayCommand.Parameters.AddWithValue("$closed_loop", closedLoop);
                 insertWayCommand.Parameters.AddWithValue("$tags", DictUtils.DictToString(way.Tags));
-                insertWayCommand.ExecuteNonQuery();
+                await insertWayCommand.ExecuteNonQueryAsync();
 
                 foreach (var node in wayNodes.Select((e, i) => new { e.Id, ordinal = i }))
                 {
@@ -218,14 +219,14 @@ public class SqliteStore : ILocationSearch
                     insertWayNodeCommand.Parameters.AddWithValue("$way_id", way.Id);
                     insertWayNodeCommand.Parameters.AddWithValue("$node_id", node.Id);
                     insertWayNodeCommand.Parameters.AddWithValue("$ordinal", node.ordinal);
-                    insertWayNodeCommand.ExecuteNonQuery();
+                    await insertWayNodeCommand.ExecuteNonQueryAsync();
                 }
             }
-            transaction.Commit();
+            await transaction.CommitAsync();
         }
     }
 
-    public IEnumerable<Way> FetchWays(long[]? ids = null, long[]? tileIds = null)
+    public async IAsyncEnumerable<Way> FetchWays(long[]? ids = null, long[]? tileIds = null)
     {
         using var connection = createConnection();
         connection.Open();
@@ -250,8 +251,8 @@ public class SqliteStore : ILocationSearch
         }
         command.CommandText += ";";
 
-        using var reader = command.ExecuteReader();
-        while (reader.Read())
+        using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
         {
             yield return new Way
             {
@@ -269,19 +270,18 @@ public class SqliteStore : ILocationSearch
         }
     }
 
-    public Dictionary<long, OsmNode[]> FetchNodesByWayIds(long[] wayIds)
+    public async Task<Dictionary<long, OsmNode[]>> FetchNodesByWayIds(long[] wayIds)
     {
         var result = wayIds.Distinct().ToDictionary(id => id, _id => Array.Empty<OsmNode>());
         using var connection = createConnection();
-        connection.Open();
 
         using var command = connection.CreateCommand();
         var q = string.Join(',', wayIds);
         command.CommandText = @"SELECT way_id, node_id, ordinal FROM way_node_map WHERE way_id IN ($way_ids);".Replace("$way_ids", q);
 
         var wayNodeMaps = wayIds.ToDictionary(id => id, _id => new List<Tuple<long, int>>());
-        using var reader = command.ExecuteReader();
-        while (reader.Read())
+        using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
         {
             var wayId = reader.GetInt64("way_id");
             var nodeId = reader.GetInt64("node_id");
@@ -290,21 +290,19 @@ public class SqliteStore : ILocationSearch
             wayNodeMaps[wayId].Add(new Tuple<long, int>(nodeId, ordinal));
         }
         var nodeIds = wayNodeMaps.SelectMany(kv => kv.Value.Select(e => e.Item1)).Distinct().ToArray();
-        var nodes = FetchNodesByIds(nodeIds);
+        var nodes = await FetchNodesByIds(nodeIds);
 
         foreach (var wayId in wayIds)
         {
-
             var wayNodeMap = wayNodeMaps[wayId];
             var wayNodes = wayNodeMap.OrderBy(m => m.Item2).Select(m => nodes!.GetValueOrDefault(m.Item1, null)).ToArray();
             result[wayId] = wayNodes!;
         }
-        connection.Close();
 
         return result;
     }
 
-    public void SaveWayParents(Dictionary<long, long[]> relationWayMap)
+    public async Task SaveWayParents(Dictionary<long, long[]> relationWayMap)
     {
         using var connection = createConnection();
         using var transaction = connection.BeginTransaction();
@@ -319,12 +317,12 @@ public class SqliteStore : ILocationSearch
                     SET area_parent_id = $area_parent_id
                     WHERE id IN($way_ids);".Replace("$way_ids", string.Join(',', wayIds));
             wayAreaParentCommand.Parameters.AddWithValue("$area_parent_id", relationId);
-            wayAreaParentCommand.ExecuteNonQuery();
+            await wayAreaParentCommand.ExecuteNonQueryAsync();
         }
-        transaction.Commit();
+        await transaction.CommitAsync();
     }
 
-    public void SaveTileAreaMap(Dictionary<string, long[]> areaTileMap)
+    public async Task SaveTileAreaMap(Dictionary<string, long[]> areaTileMap)
     {
         using var connection = createConnection();
         using var transaction = connection.BeginTransaction();
@@ -345,12 +343,12 @@ public class SqliteStore : ILocationSearch
             .Replace("$source", areaSource)
             // because sqlite has the dumbest rules about SQL variables                
             .Replace("$values", String.Join("\n", tileIds.Select(t => $"INSERT INTO tile_area_map(area_id, tile_id) SELECT id, {t} FROM temp_id;")));
-            command.ExecuteNonQuery();
+            await command.ExecuteNonQueryAsync();
         }
-        transaction.Commit();
+        await transaction.CommitAsync();
     }
 
-    public void SaveAreaBatch(IEnumerable<Area> areaBatch)
+    public async Task SaveAreaBatch(IEnumerable<Area> areaBatch)
     {
         using var connection = createConnection();
         using var transaction = connection.BeginTransaction();
@@ -382,12 +380,12 @@ public class SqliteStore : ILocationSearch
             insertAreaCommand.Parameters.AddWithValue("$min_height", area.MinHeight);
             insertAreaCommand.Parameters.AddWithValue("$is_large", area.IsLarge);
 
-            insertAreaCommand.ExecuteNonQuery();
+            await insertAreaCommand.ExecuteNonQueryAsync();
         }
-        transaction.Commit();
+        await transaction.CommitAsync();
     }
 
-    public IEnumerable<Area> FetchAreas(long[]? ids = null, long[]? tileIds = null)
+    public async IAsyncEnumerable<Area> FetchAreas(long[]? ids = null, long[]? tileIds = null)
     {
         using var connection = createConnection();
         connection.Open();
@@ -414,8 +412,8 @@ public class SqliteStore : ILocationSearch
         }
         command.CommandText += ";";
 
-        using var reader = command.ExecuteReader();
-        while (reader.Read())
+        using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
         {
             yield return new Area
             {
@@ -440,7 +438,7 @@ public class SqliteStore : ILocationSearch
         }
     }
 
-    public IEnumerable<long> FetchAreaIdsByTileIds(long[] tileIds)
+    public async IAsyncEnumerable<long> FetchAreaIdsByTileIds(long[] tileIds)
     {
         using var connection = createConnection();
         connection.Open();
@@ -448,8 +446,8 @@ public class SqliteStore : ILocationSearch
         using var command = connection.CreateCommand();
         command.CommandText = @"SELECT area_id FROM tile_area_map WHERE tile_id IN ($tile_ids);".Replace("$tile_ids", string.Join(",", tileIds));
 
-        using var reader = command.ExecuteReader();
-        while (reader.Read())
+        using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
         {
             var areaId = reader.GetInt64(0);
             yield return areaId;

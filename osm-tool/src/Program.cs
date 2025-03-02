@@ -1,8 +1,9 @@
-﻿using OsmTool;
+﻿using System.Threading.Tasks;
+using OsmTool;
 
 public class Program
 {
-    public static void Main(string[] args)
+    public static async Task Main(string[] args)
     {
         var startTime = DateTimeOffset.Now;
         string datafile = "datasets/westminster.osm";
@@ -45,7 +46,7 @@ public class Program
         // ILocationSearch locationSearch = new LuceneLocationSearch(searchIndexPath);
         ILocationSearch locationSearch = store;
         var service = new OsmService(store, locationSearch);
-        service.BuildDatabase(reader);
+        await service.BuildDatabase(reader);
 
         if (locationSearch is IDisposable disposable) {
             disposable?.Dispose();

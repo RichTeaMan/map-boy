@@ -4,7 +4,7 @@ using OsmTool.Models;
 
 namespace OsmTool;
 
-public class SqliteStore
+public class SqliteStore : ILocationSearch
 {
     private readonly TileService tileService = new TileService();
 
@@ -456,74 +456,6 @@ public class SqliteStore
         }
     }
 
-    public void BuildSearchIndex()
-    {
-        using var connection = createConnection();
-        connection.Open();
-
-        using var searchIndexTableCommand = connection.CreateCommand();
-        searchIndexTableCommand.CommandText = @"
-            CREATE TABLE search_index (
-                name TEXT NULL,
-                lat REAL NOT NULL,
-                lon REAL NOT NULL
-            );
-            CREATE INDEX idx_search_index_name ON search_index (name);
-            ";
-
-        searchIndexTableCommand.ExecuteNonQuery();
-
-        var searchIndexBatch = new List<Tuple<string, Coord>>();
-
-        var commit = () =>
-        {
-            if (searchIndexBatch.Count == 0)
-            {
-                return;
-            }
-            using var transaction = connection.BeginTransaction();
-            foreach (var searchIndexTuple in searchIndexBatch)
-            {
-                var batchName = searchIndexTuple.Item1;
-                var batchCoord = searchIndexTuple.Item2;
-                using var searchIndexCommand = connection.CreateCommand();
-                searchIndexCommand.Transaction = transaction;
-                searchIndexCommand.CommandText = @"
-                        INSERT INTO search_index (name, lat, lon)
-                        VALUES ($name, $lat, $lon);
-                    ";
-                searchIndexCommand.Parameters.AddWithValue("$name", batchName);
-                searchIndexCommand.Parameters.AddWithValue("$lat", batchCoord.Lat);
-                searchIndexCommand.Parameters.AddWithValue("$lon", batchCoord.Lon);
-
-                searchIndexCommand.ExecuteNonQuery();
-            }
-            transaction.Commit();
-            searchIndexBatch.Clear();
-        };
-
-        foreach (var area in FetchAreas())
-        {
-            string? areaName = area?.Name;
-            if (areaName == null)
-            {
-                continue;
-            }
-            var coord = area?.OuterCoordinates?.FirstOrDefault()?.FirstOrDefault();
-            if (coord == null)
-            {
-                continue;
-            }
-            searchIndexBatch.Add(new Tuple<string, Coord>(areaName, coord));
-
-            if (searchIndexBatch.Count >= 1000)
-            {
-                commit();
-            }
-        }
-        commit();
-    }
-    
     public IEnumerable<SearchIndexResult> SearchAreas(string searchTerm)
     {
         using var connection = createConnection();
@@ -543,6 +475,48 @@ public class SqliteStore
                 Lon = reader.GetDouble("lon"),
                 Rank = 0.5
             };
+        }
+    }
+
+    public void InitIndex()
+    {
+        using var connection = createConnection();
+        connection.Open();
+
+        using var searchIndexTableCommand = connection.CreateCommand();
+        searchIndexTableCommand.CommandText = @"
+            CREATE TABLE search_index (
+                name TEXT NULL,
+                lat REAL NOT NULL,
+                lon REAL NOT NULL
+            );
+            CREATE INDEX idx_search_index_name ON search_index (name);
+            ";
+
+        searchIndexTableCommand.ExecuteNonQuery();
+    }
+
+    public void UpdateIndex(IEnumerable<SearchIndexEntry> searchIndexEntries)
+    {
+        using var connection = createConnection();
+        foreach (var searchIndexBatch in searchIndexEntries.Chunk(1000))
+        {
+            using var transaction = connection.BeginTransaction();
+            foreach (var searchIndexTuple in searchIndexBatch)
+            {
+                using var searchIndexCommand = connection.CreateCommand();
+                searchIndexCommand.Transaction = transaction;
+                searchIndexCommand.CommandText = @"
+                        INSERT INTO search_index (name, lat, lon)
+                        VALUES ($name, $lat, $lon);
+                    ";
+                searchIndexCommand.Parameters.AddWithValue("$name", searchIndexTuple.Name);
+                searchIndexCommand.Parameters.AddWithValue("$lat", searchIndexTuple.Lat);
+                searchIndexCommand.Parameters.AddWithValue("$lon", searchIndexTuple.Lon);
+
+                searchIndexCommand.ExecuteNonQuery();
+            }
+            transaction.Commit();
         }
     }
 }

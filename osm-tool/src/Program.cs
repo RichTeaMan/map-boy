@@ -37,10 +37,19 @@ public class Program
             Console.WriteLine("Unknown file format");
             return;
         }
-        string dbPath = (datafile + ".db").Split("/").Last();
+        string basePath = datafile.Split("/").Last();
+        string dbPath = basePath + ".db";
         File.Delete(dbPath);
-        var service = new OsmService(new SqliteStore(dbPath));
+        var store = new SqliteStore(dbPath);
+        // string searchIndexPath = basePath + ".index";
+        // ILocationSearch locationSearch = new LuceneLocationSearch(searchIndexPath);
+        ILocationSearch locationSearch = store;
+        var service = new OsmService(store, locationSearch);
         service.BuildDatabase(reader);
+
+        if (locationSearch is IDisposable disposable) {
+            disposable?.Dispose();
+        }
 
         var endTime = DateTimeOffset.Now;
         var duration = endTime - startTime;

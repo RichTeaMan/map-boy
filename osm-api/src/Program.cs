@@ -3,9 +3,20 @@ using OsmTool;
 public class Program
 {
 
-    private static SqliteStore createSqliteStore()
+    private static SqliteStore CreateSqliteStore()
     {
         return new SqliteStore("osm.db");
+    }
+
+    private static ILocationSearch? locationSearch;
+    private static ILocationSearch CreateSearchIndex()
+    {
+        if (locationSearch == null)
+        {
+            //locationSearch = new LuceneLocationSearch("osm.index");
+            locationSearch = CreateSqliteStore();
+        }
+        return locationSearch;
     }
 
     public static void Main(string[] args)
@@ -28,7 +39,7 @@ public class Program
 
         app.MapGet("/areas", async (httpContext) =>
         {
-            var store = createSqliteStore();
+            var store = CreateSqliteStore();
             long[]? tileIds = null;
             if (httpContext.Request.Query.TryGetValue("tileId", out var tileIdStr))
             {
@@ -41,7 +52,6 @@ public class Program
                 return;
             }
             var areas = store.FetchAreas(null, tileIds)
-                //.Where(a => a.SuggestedColour != "white")
                 .Where(a => !a.IsLarge)
                 .ToArray();
             var areaTileIds = store.FetchAreaIdsByTileIds(tileIds).ToArray();
@@ -56,7 +66,7 @@ public class Program
 
         app.MapGet("/areasByIds", async (httpContext) =>
         {
-            var store = createSqliteStore();
+            var store = CreateSqliteStore();
             long[]? areaIds = null;
             if (httpContext.Request.Query.TryGetValue("ids", out var idsStr))
             {
@@ -83,7 +93,7 @@ public class Program
 
         app.MapGet("/search/{searchTerm}", (string searchTerm) =>
         {
-            var store = createSqliteStore();
+            var store = CreateSearchIndex();
             return store.SearchAreas(searchTerm).Take(20).ToArray();
         })
         .WithName("SearchAreas");

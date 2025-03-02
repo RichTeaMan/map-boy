@@ -92,9 +92,12 @@ public class OsmService
 
     private readonly SqliteStore sqliteStore;
 
-    public OsmService(SqliteStore sqliteStore)
+    private readonly ILocationSearch locationSearch;
+
+    public OsmService(SqliteStore sqliteStore, ILocationSearch locationSearch)
     {
         this.sqliteStore = sqliteStore;
+        this.locationSearch = locationSearch;
     }
 
     public void BuildDatabase(IReader reader)
@@ -111,7 +114,22 @@ public class OsmService
         SaveAreas(reader);
 
         Console.WriteLine("Building search index...");
-        sqliteStore.BuildSearchIndex();
+        BuildSearchIndex();
+    }
+
+    private void BuildSearchIndex()
+    {
+
+        locationSearch.InitIndex();
+
+        var searchIndexEntries = sqliteStore.FetchAreas().Where(a => !string.IsNullOrWhiteSpace(a?.Name) && a?.OuterCoordinates?.FirstOrDefault()?.FirstOrDefault() != null)
+        .Select(area =>
+        {
+            string areaName = area.Name!;
+            var coord = area?.OuterCoordinates?.FirstOrDefault()?.FirstOrDefault()!;
+            return new SearchIndexEntry { Name = areaName, Lat = coord.Lat, Lon = coord.Lon };
+        });
+        locationSearch.UpdateIndex(searchIndexEntries);
     }
 
     public void SaveNodes(IReader reader)

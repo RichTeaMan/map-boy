@@ -22,9 +22,11 @@ RUN apt-get update && \
 RUN update-alternatives --set x86_64-w64-mingw32-gcc /usr/bin/x86_64-w64-mingw32-gcc-posix && \
   update-alternatives --set x86_64-w64-mingw32-g++ /usr/bin/x86_64-w64-mingw32-g++-posix
 
+USER 1001:1001
+
 WORKDIR /project
 
-RUN git clone https://github.com/emscripten-core/emsdk.git && \
+RUN git clone --branch "4.0.4" --depth 1 https://github.com/emscripten-core/emsdk.git && \
   cd emsdk && \
   ./emsdk install latest
 

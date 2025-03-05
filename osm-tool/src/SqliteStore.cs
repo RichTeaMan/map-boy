@@ -89,6 +89,9 @@ public class SqliteStore : ILocationSearch
             layer INTEGER NOT NULL,
             height REAL NOT NULL,
             min_height REAL NOT NULL,
+            roof_type TEXT NOT NULL,
+            roof_height REAL NOT NULL,
+            roof_colour TEXT NOT NULL, 
             is_large INTEGER NOT NULL
         );
         CREATE INDEX idx_area_tile_id ON area (tile_id);
@@ -360,8 +363,8 @@ public class SqliteStore : ILocationSearch
             using var insertAreaCommand = connection.CreateCommand();
             insertAreaCommand.Transaction = transaction;
             insertAreaCommand.CommandText = @"
-                    INSERT INTO area (source, visible, version, change_set, timestamp, user, uid, outer_coords, inner_coords, name, suggested_colour, tile_id, layer, height, min_height, is_large)
-                        VALUES($source, $visible, $version, $change_set, $timestamp, $user, $uid, $outer_coords, $inner_coords, $name, $suggested_colour, $tile_id, $layer, $height, $min_height, $is_large);
+                    INSERT INTO area (source, visible, version, change_set, timestamp, user, uid, outer_coords, inner_coords, name, suggested_colour, tile_id, layer, height, min_height, roof_type, roof_height, roof_colour, is_large)
+                        VALUES($source, $visible, $version, $change_set, $timestamp, $user, $uid, $outer_coords, $inner_coords, $name, $suggested_colour, $tile_id, $layer, $height, $min_height, $roof_type, $roof_height, $roof_colour, $is_large);
                     ";
             insertAreaCommand.Parameters.AddWithValue("$source", area.Source);
             insertAreaCommand.Parameters.AddWithValue("$visible", area.Visible as object ?? DBNull.Value);
@@ -378,6 +381,9 @@ public class SqliteStore : ILocationSearch
             insertAreaCommand.Parameters.AddWithValue("$layer", area.Layer);
             insertAreaCommand.Parameters.AddWithValue("$height", area.Height);
             insertAreaCommand.Parameters.AddWithValue("$min_height", area.MinHeight);
+            insertAreaCommand.Parameters.AddWithValue("$roof_type", area.RoofType);
+            insertAreaCommand.Parameters.AddWithValue("$roof_height", area.RoofHeight);
+            insertAreaCommand.Parameters.AddWithValue("$roof_colour", area.RoofColour);
             insertAreaCommand.Parameters.AddWithValue("$is_large", area.IsLarge);
 
             await insertAreaCommand.ExecuteNonQueryAsync();
@@ -391,7 +397,7 @@ public class SqliteStore : ILocationSearch
         connection.Open();
 
         using var command = connection.CreateCommand();
-        command.CommandText = @"SELECT id, source, visible, version, change_set, timestamp, user, uid, outer_coords, inner_coords, name, suggested_colour, tile_id, layer, height, min_height, is_large FROM area";
+        command.CommandText = @"SELECT id, source, visible, version, change_set, timestamp, user, uid, outer_coords, inner_coords, name, suggested_colour, tile_id, layer, height, min_height, roof_type, roof_height, roof_colour, is_large FROM area";
 
         var whereClauses = new List<string>();
 
@@ -433,6 +439,9 @@ public class SqliteStore : ILocationSearch
                 Layer = reader.GetInt32("layer"),
                 Height = reader.GetDouble("height"),
                 MinHeight = reader.GetDouble("min_height"),
+                RoofType = reader.GetString("roof_type"),
+                RoofHeight = reader.GetDouble("roof_height"),
+                RoofColour = reader.GetString("roof_colour"),
                 IsLarge = reader.GetBoolean("is_large"),
             };
         }

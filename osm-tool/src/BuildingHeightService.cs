@@ -1,9 +1,30 @@
-public class BuildingHeightResult {
+namespace OsmTool;
+
+public class BuildingHeightResult
+{
     public double Height { get; set; }
     public double MinHeight { get; set; }
 }
 
-public class BuildingHeightService {
+public class RoofInfo
+{
+    public required string RoofType { get; set; }
+    public double RoofHeight { get; set; }
+    public required string RoofColour { get; set; }
+
+    public static RoofInfo Default()
+    {
+        return new RoofInfo
+        {
+            RoofColour = "",
+            RoofType = "",
+            RoofHeight = 0.0
+        };
+    }
+}
+
+public class BuildingHeightService
+{
 
 
     public BuildingHeightResult CalcBuildingHeight(Dictionary<string, string> tags)
@@ -86,8 +107,10 @@ public class BuildingHeightService {
         {
             height += 1.5;
         }
-        if (tags.TryGetValue("building:levels", out string? buildingLevelsStr)) {
-            if (double.TryParse(buildingLevelsStr, out double buildingLevels)) {
+        if (tags.TryGetValue("building:levels", out string? buildingLevelsStr))
+        {
+            if (double.TryParse(buildingLevelsStr, out double buildingLevels))
+            {
                 height = buildingLevels * 3; // 3m suggested in https://wiki.openstreetmap.org/wiki/Key:building:levels?uselang=en-GB. not a great, but works if height is not specified
             }
         }
@@ -113,10 +136,41 @@ public class BuildingHeightService {
             }
         }
 
-        return new BuildingHeightResult{
+        return new BuildingHeightResult
+        {
             Height = height,
             MinHeight = minHeight
         };
     }
 
+    public RoofInfo FetchRoofInfo(Dictionary<string, string> tags)
+    {
+
+        string resultRoofColour = "";
+        string resultRoofType = "";
+        double resultRoofHeight = 0.0;
+        if (tags.TryGetValue("roof:colour", out string? roofColour))
+        {
+            resultRoofColour = roofColour;
+        }
+
+        if (tags.TryGetValue("roof:shape", out string? roofShape))
+        {
+            resultRoofType = roofShape;
+        }
+
+        if (tags.TryGetValue("roof:height", out string? roofHeightStr))
+        {
+            if (double.TryParse(roofHeightStr, out double roofHeight))
+            {
+                resultRoofHeight = roofHeight;
+            }
+        }
+        return new RoofInfo
+        {
+            RoofColour = resultRoofColour,
+            RoofType = resultRoofType,
+            RoofHeight = resultRoofHeight
+        };
+    }
 }

@@ -81,7 +81,7 @@ static func create_2d_mesh_from_polygon(polygon_points: PackedVector2Array, inne
         var indices = Geometry2D.triangulate_polygon(polygon_points)
 
         if indices.is_empty():
-            printerr("Error: Triangulation failed.")
+            printerr("Error: Triangulation failed over %s points." % polygon_points.size())
             #for p in polygon_points:
             #    print("%s, %s" % [p.x, p.y])
             continue
@@ -107,13 +107,52 @@ static func create_3d_mesh_from_polygon(polygon_points: PackedVector2Array, heig
     var indices = Geometry2D.triangulate_polygon(polygon_points)
 
     if indices.is_empty():
-        printerr("Error: Triangulation failed.")
+        printerr("Error: Triangulation failed over %s points." % polygon_points.size())
         return null
 
     var arrays = []
     arrays.resize(Mesh.ARRAY_MAX)
 
     return _generate_extruded_mesh(polygon_points, indices, height)
+
+static func _generate_roof_mesh(polygon_points: PackedVector2Array, area) -> ArrayMesh:
+    if (area.roofType == "pyramidal"):
+        var roof_vertices = PackedVector3Array()
+        var centre = Vector2()
+        var is_clockwise = Geometry2D.is_polygon_clockwise(polygon_points)
+        for p in polygon_points:
+            roof_vertices.append(Vector3(p.x, 0, p.y))
+            centre += p
+        if is_clockwise:
+            roof_vertices.reverse()
+        centre = Vector2(centre.x / polygon_points.size(), centre.y / polygon_points.size())
+        var centre_index = roof_vertices.size()
+        roof_vertices.append(Vector3(centre.x, area.roofHeight, centre.y))
+        var roof_indices = PackedInt32Array()
+        
+        for i in range(polygon_points.size()):
+            var next_index = (i + 1) % polygon_points.size()
+            roof_indices.append(i)
+            roof_indices.append(next_index)
+            roof_indices.append(centre_index)
+        var arrays : Array = []
+        arrays.resize(Mesh.ARRAY_MAX)
+        arrays[Mesh.ARRAY_VERTEX] = roof_vertices
+        arrays[Mesh.ARRAY_INDEX] = roof_indices
+        var mesh = ArrayMesh.new()
+        mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+        return mesh
+    return null
+
+static func generate_roof(polygon_points: PackedVector2Array, area):
+    var mesh = _generate_roof_mesh(polygon_points, area)
+    if mesh == null:
+        return null
+    var mesh_instance = MeshInstance3D.new()
+    mesh_instance.mesh = mesh
+    mesh.surface_set_material(0, fetch_material("polygon-%s" % area.roofColour))
+    mesh_instance.position.y = area.height - (area.roofHeight + area.minHeight)
+    return mesh_instance
 
 static func _generate_extruded_mesh(points: PackedVector2Array, triangle_indices: PackedInt32Array, extrusion_height: float) -> ArrayMesh:
     var arrays : Array = []
@@ -180,9 +219,8 @@ static func _generate_extruded_mesh(points: PackedVector2Array, triangle_indices
     return mesh
 
 static func create_area_node(area) -> MapAreaNode:
-
     if area.outerCoordinates.size() == 0:
-        printerr("Closed loop way must have at least 3 nodes.")
+        printerr("Closed loop way must have at least 1 collection of outer coordinates.")
         return null
     if area.outerCoordinates[0].size() == 0:
         printerr("Closed loop way must have at least 3 nodes.")
@@ -193,13 +231,13 @@ static func create_area_node(area) -> MapAreaNode:
         area_colour = "polygon-%s" % area_colour
         y_position = area.minHeight
     var position = Vector2(area.outerCoordinates[0][0].lat * Global.coord_factor, area.outerCoordinates[0][0].lon * Global.coord_factor)
+    var position_unscaled = Vector2(area.outerCoordinates[0][0].lat, area.outerCoordinates[0][0].lon)
     
     var map_area_node = MapAreaNode.new()
     map_area_node.name = "area-%s" % area.id
     
     var inner_zones: Array[PackedVector2Array] = []
     for coordinates in area.innerCoordinates:
-
         if coordinates.size() < 3:
             printerr("Closed loop inner zone must have at least 3 nodes.")
             continue
@@ -221,24 +259,39 @@ static func create_area_node(area) -> MapAreaNode:
         var vertices := PackedVector2Array()
         
         for c in coordinates:
-            var coord_vector = Vector2(c.lat * Global.coord_factor, c.lon * Global.coord_factor)
-            vertices.append(coord_vector - position)
+            var coord_vector = Vector2(c.lat, c.lon)
+            var adj = (coord_vector - position_unscaled) * Global.coord_factor
+            #print("%s,%s"%[coord_vector.x, coord_vector.y])
+            #print("%s,%s"%[adj.x, adj.y])
+            vertices.append(adj)
+            
+                
 
         var meshes: Array[ArrayMesh] = []
         if area.height > 0.5:
-            var mesh = create_3d_mesh_from_polygon(vertices, area.height - area.minHeight)
-            if mesh != null:
-                meshes.append(mesh)
+            var mesh = create_3d_mesh_from_polygon(vertices, area.height - (area.roofHeight + area.minHeight))
+            meshes.append(mesh)
         else:
             meshes.append_array(create_2d_mesh_from_polygon(vertices, inner_zones))
 
         for mesh in meshes:
+            if mesh == null:
+                continue
             var mesh_instance = MeshInstance3D.new()
             mesh_instance.mesh = mesh
             mesh.surface_set_material(0, fetch_material(area_colour))
             map_area_node.add_child(mesh_instance)
+        var roof_node = generate_roof(vertices, area)
+        if roof_node != null:
+            map_area_node.add_child(roof_node)
     
     if map_area_node.get_child_count() == 0:
+        print("Mesh failure for area [%s]" % area.source)
+        for coll in area.outerCoordinates:
+            for c in coll:
+                pass
+                #print("%s,%s"%[c.lat, c.lon])
+            #print("---")
         return null
     
     map_area_node.area_id = area.id

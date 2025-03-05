@@ -78,7 +78,11 @@ public class Area
     public double Height { get; set; }
 
     public double MinHeight { get; set; }
+    public double RoofHeight { get; set; }
+    public required string RoofType { get; set; }
+    public required string RoofColour { get; set; }
     public bool IsLarge { get; set; }
+
 }
 
 public class OsmService
@@ -297,6 +301,7 @@ public class OsmService
                     var largeTileResult = tileService.CalcLargeTileRange(coords);
                     var heightResult = heightService.CalcBuildingHeight(relation.Tags);
                     var tileId = tileService.CalcTileId(coords);
+                    var roofInfo = RoofInfo.Default();
 
                     string name = relation.Tags.GetValueOrDefault("name", "");
                     int layer = 0;
@@ -321,6 +326,9 @@ public class OsmService
                         Layer = layer,
                         Height = heightResult.Height,
                         MinHeight = heightResult.MinHeight,
+                        RoofColour = roofInfo.RoofColour,
+                        RoofType = roofInfo.RoofType,
+                        RoofHeight = roofInfo.RoofHeight,
                         IsLarge = largeTileResult.IsLarge
                     };
 
@@ -378,6 +386,7 @@ public class OsmService
 
                 var largeTileResult = tileService.CalcLargeTileRange(orderedCoords);
                 var heightResult = heightService.CalcBuildingHeight(wayTags);
+                var roofInfo = heightService.FetchRoofInfo(wayTags);
 
                 string name = wayTags.GetValueOrDefault("name", "");
                 int layer = 0;
@@ -402,6 +411,9 @@ public class OsmService
                     Layer = layer,
                     Height = heightResult.Height,
                     MinHeight = heightResult.MinHeight,
+                    RoofColour = roofInfo.RoofColour,
+                    RoofType = roofInfo.RoofType,
+                    RoofHeight = roofInfo.RoofHeight,
                     IsLarge = largeTileResult.IsLarge
                 };
 
@@ -496,6 +508,7 @@ public class OsmService
                 var highwayCoords = highwayBuilderService.CalcHighwayCoordinates(orderedCoords, width)
                     .ToArray();
                 var tile = tileService.CalcTileId(orderedCoords.Average(n => n.Lat), orderedCoords.Average(n => n.Lon));
+                var roofInfo = RoofInfo.Default();
 
                 string name = wayTags.GetValueOrDefault("name", "");
                 int layer = 0;
@@ -520,6 +533,9 @@ public class OsmService
                     Layer = layer,
                     Height = 0.1,
                     MinHeight = 0.0,
+                    RoofColour = roofInfo.RoofColour,
+                    RoofType = roofInfo.RoofType,
+                    RoofHeight = roofInfo.RoofHeight,
                     IsLarge = false
                 };
 

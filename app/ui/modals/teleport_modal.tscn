@@ -1,6 +1,6 @@
 [gd_scene load_steps=2 format=3 uid="uid://b0e4pvbt3at7d"]
 
-[ext_resource type="Script" path="res://ui/modals/teleport_modal.gd" id="1_xavld"]
+[ext_resource type="Script" uid="uid://c2k0jk6dmfaq7" path="res://ui/modals/teleport_modal.gd" id="1_xavld"]
 
 [node name="TeleportModal" type="Window"]
 title = "Teleport"

@@ -1,8 +1,8 @@
 [gd_scene load_steps=7 format=3 uid="uid://dnot2k6d5atay"]
 
-[ext_resource type="Script" path="res://main.gd" id="1_4rdyb"]
+[ext_resource type="Script" uid="uid://b6efl8tcjqitj" path="res://main.gd" id="1_4rdyb"]
 [ext_resource type="PackedScene" uid="uid://ca587oe3rcyf5" path="res://marker.tscn" id="2_8qnr4"]
-[ext_resource type="Script" path="res://custom_nodes/http_request_pool.gd" id="2_xvfvq"]
+[ext_resource type="Script" uid="uid://c2ewgv377dder" path="res://custom_nodes/http_request_pool.gd" id="2_xvfvq"]
 
 [sub_resource type="PhysicalSkyMaterial" id="PhysicalSkyMaterial_3s87r"]
 

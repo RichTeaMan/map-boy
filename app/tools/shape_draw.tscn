@@ -1,6 +1,6 @@
 [gd_scene load_steps=2 format=3 uid="uid://csnuxjqsm4vpy"]
 
-[ext_resource type="Script" path="res://tools/shape_draw.gd" id="1_fynvl"]
+[ext_resource type="Script" uid="uid://ckixtm66jbq2m" path="res://tools/shape_draw.gd" id="1_fynvl"]
 
 [node name="ShapeDraw" type="Node3D"]
 script = ExtResource("1_fynvl")

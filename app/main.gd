@@ -6,7 +6,7 @@ var loaded_tiles = {}
 var loaded_large_area_ids = {}
 
 var area_queue = []
-var large_area_queue = []
+var large_area_queue: Array[int] = []
 var area_pending = false
 var tiles_pending = false
 var last_pos_lat = null
@@ -207,7 +207,7 @@ func _on_areas_http_request_request_completed(_result, _response_code, _headers,
     var area_response = JSON.parse_string(body.get_string_from_utf8())
     var areas = area_response.areas
     var large_area_ids = area_response.largeAreaIds
-    for large_area_id in large_area_ids:
+    for large_area_id: int in large_area_ids:
         if !loaded_large_area_ids.has(large_area_id):
             large_area_queue.append(large_area_id)
     create_areas(areas)

@@ -173,4 +173,25 @@ public class BuildingHeightService
             RoofHeight = resultRoofHeight
         };
     }
+
+    /// <summary>
+    /// True if the given tags are for a building with 3D specfic rendering instructions.
+    /// 
+    /// False result may still have a height tag, but only as a general indication.
+    /// </summary>
+    /// <param name="tags"></param>
+    /// <returns></returns>
+    public bool Is3dBuilding(Dictionary<string, string> tags)
+    {
+
+        if (tags.GetValueOrDefault("building:part", "").ToLower() == "yes")
+        {
+            return true;
+        }
+        var tagNames = new string[] {
+            "building:colour",
+            "roof:colour", // some flat buidling seem to have this one, but removing them leaves lots of holes in the map
+        };
+        return tagNames.Any(tags.ContainsKey);
+    }
 }

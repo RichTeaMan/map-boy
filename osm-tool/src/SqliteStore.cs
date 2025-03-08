@@ -1,5 +1,4 @@
 using System.Data;
-using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 using OsmTool.Models;
 
@@ -92,7 +91,8 @@ public class SqliteStore : ILocationSearch
             roof_type TEXT NOT NULL,
             roof_height REAL NOT NULL,
             roof_colour TEXT NOT NULL, 
-            is_large INTEGER NOT NULL
+            is_large INTEGER NOT NULL,
+            is_3d INTEGER NOT NULL
         );
         CREATE INDEX idx_area_tile_id ON area (tile_id);
         CREATE INDEX idx_area_source ON area (source);
@@ -363,8 +363,8 @@ public class SqliteStore : ILocationSearch
             using var insertAreaCommand = connection.CreateCommand();
             insertAreaCommand.Transaction = transaction;
             insertAreaCommand.CommandText = @"
-                    INSERT INTO area (source, visible, version, change_set, timestamp, user, uid, outer_coords, inner_coords, name, suggested_colour, tile_id, layer, height, min_height, roof_type, roof_height, roof_colour, is_large)
-                        VALUES($source, $visible, $version, $change_set, $timestamp, $user, $uid, $outer_coords, $inner_coords, $name, $suggested_colour, $tile_id, $layer, $height, $min_height, $roof_type, $roof_height, $roof_colour, $is_large);
+                    INSERT INTO area (source, visible, version, change_set, timestamp, user, uid, outer_coords, inner_coords, name, suggested_colour, tile_id, layer, height, min_height, roof_type, roof_height, roof_colour, is_large, is_3d)
+                        VALUES($source, $visible, $version, $change_set, $timestamp, $user, $uid, $outer_coords, $inner_coords, $name, $suggested_colour, $tile_id, $layer, $height, $min_height, $roof_type, $roof_height, $roof_colour, $is_large, $is_3d);
                     ";
             insertAreaCommand.Parameters.AddWithValue("$source", area.Source);
             insertAreaCommand.Parameters.AddWithValue("$visible", area.Visible as object ?? DBNull.Value);
@@ -385,6 +385,7 @@ public class SqliteStore : ILocationSearch
             insertAreaCommand.Parameters.AddWithValue("$roof_height", area.RoofHeight);
             insertAreaCommand.Parameters.AddWithValue("$roof_colour", area.RoofColour);
             insertAreaCommand.Parameters.AddWithValue("$is_large", area.IsLarge);
+            insertAreaCommand.Parameters.AddWithValue("$is_3d", area.Is3d);
 
             await insertAreaCommand.ExecuteNonQueryAsync();
         }
@@ -397,7 +398,7 @@ public class SqliteStore : ILocationSearch
         connection.Open();
 
         using var command = connection.CreateCommand();
-        command.CommandText = @"SELECT id, source, visible, version, change_set, timestamp, user, uid, outer_coords, inner_coords, name, suggested_colour, tile_id, layer, height, min_height, roof_type, roof_height, roof_colour, is_large FROM area";
+        command.CommandText = @"SELECT id, source, visible, version, change_set, timestamp, user, uid, outer_coords, inner_coords, name, suggested_colour, tile_id, layer, height, min_height, roof_type, roof_height, roof_colour, is_large, is_3d FROM area";
 
         var whereClauses = new List<string>();
 
@@ -443,6 +444,7 @@ public class SqliteStore : ILocationSearch
                 RoofHeight = reader.GetDouble("roof_height"),
                 RoofColour = reader.GetString("roof_colour"),
                 IsLarge = reader.GetBoolean("is_large"),
+                Is3d = reader.GetBoolean("is_3d"),
             };
         }
     }
@@ -525,5 +527,26 @@ public class SqliteStore : ILocationSearch
             }
             transaction.Commit();
         }
+    }
+
+    public async Task UpdateAreaVisibility(bool visible, long[] areaIds)
+    {
+
+        using var connection = createConnection();
+        using var transaction = connection.BeginTransaction();
+        foreach (var batchAreaIds in areaIds.Chunk(100))
+        {
+            using var searchIndexCommand = connection.CreateCommand();
+            searchIndexCommand.Transaction = transaction;
+            searchIndexCommand.CommandText = @"
+                    UPDATE area
+                    SET visible = $visible
+                    WHERE id IN ( $ids );
+                "
+                .Replace("$ids", string.Join(", ", batchAreaIds));
+            searchIndexCommand.Parameters.AddWithValue("$visible", visible);
+            await searchIndexCommand.ExecuteNonQueryAsync();
+        }
+        await transaction.CommitAsync();
     }
 }

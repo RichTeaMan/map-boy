@@ -39,6 +39,11 @@ public class TileService
         return tile;
     }
 
+    public long CalcTileId(Coord coord)
+    {
+        return CalcTileId(coord.Lat, coord.Lon);
+    }
+
     public long CalcTileId(IEnumerable<Coord> coords)
     {
         return CalcTileId(coords.Average(n => n.Lat), coords.Average(n => n.Lon));
@@ -47,6 +52,19 @@ public class TileService
     public long CalcTileId(Coord[][] coords)
     {
         return CalcTileId(coords.SelectMany(c => c));
+    }
+
+    public IEnumerable<long> CalcAllTileIds(IEnumerable<Coord> coords)
+    {
+        foreach (var c in coords)
+        {
+            yield return CalcTileId(c);
+        }
+    }
+
+    public IEnumerable<long> CalcAllTileIds(Coord[][] coords)
+    {
+        return CalcAllTileIds(coords.SelectMany(c => c));
     }
 
     private void CalcRowColumn(double lat, double lon, out long latTile, out long lonTile)

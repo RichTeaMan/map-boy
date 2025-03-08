@@ -53,6 +53,7 @@ public class Program
             }
             var areas = await store.FetchAreas(null, tileIds)
                 .Where(a => !a.IsLarge)
+                .Where(a => a.Visible)
                 .ToArrayAsync();
             var areaTileIds = await store.FetchAreaIdsByTileIds(tileIds).ToArrayAsync();
             var container = new AreaContainer
@@ -72,7 +73,7 @@ public class Program
             {
                 areaIds = idsStr.Select(id => long.Parse(idsStr.ToString())).ToArray();
             }
-            var areas = await store.FetchAreas(areaIds).ToArrayAsync();
+            var areas = await store.FetchAreas(areaIds).Where(a => a.Visible).ToArrayAsync();
             await httpContext.Response.WriteAsJsonAsync(areas);
         })
         .WithName("GetAreaByIds");

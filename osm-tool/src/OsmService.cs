@@ -1,5 +1,4 @@
 using System.Data;
-using System.Threading.Tasks;
 using OsmTool.Models;
 
 namespace OsmTool;
@@ -63,7 +62,7 @@ public class Area
     public long Id { get; set; }
 
     public required string Source { get; set; }
-    public bool? Visible { get; set; }
+    public bool Visible { get; set; }
     public int? Version { get; set; }
     public long? ChangeSet { get; set; }
     public DateTimeOffset? Timestamp { get; set; }
@@ -82,6 +81,8 @@ public class Area
     public required string RoofType { get; set; }
     public required string RoofColour { get; set; }
     public bool IsLarge { get; set; }
+
+    public bool Is3d { get; set; }
 
 }
 
@@ -120,6 +121,9 @@ public class OsmService
 
         Console.WriteLine("Building search index...");
         BuildSearchIndex();
+
+        Console.WriteLine("Deduplicating 3D and 2D buildings...");
+        await Deduplicate3dBuildings();
     }
 
     private void BuildSearchIndex()
@@ -301,6 +305,7 @@ public class OsmService
                     var largeTileResult = tileService.CalcLargeTileRange(coords);
                     var heightResult = heightService.CalcBuildingHeight(relation.Tags);
                     var tileId = tileService.CalcTileId(coords);
+                    var is3d = heightService.Is3dBuilding(relation.Tags);
                     var roofInfo = RoofInfo.Default();
 
                     string name = relation.Tags.GetValueOrDefault("name", "");
@@ -312,7 +317,7 @@ public class OsmService
                     var relationArea = new Area
                     {
                         Source = $"relation-{relation.Id}",
-                        Visible = relation.Visible,
+                        Visible = relation.Visible ?? true,
                         Version = relation.Version,
                         ChangeSet = relation.ChangeSet,
                         Timestamp = relation.Timestamp,
@@ -329,7 +334,8 @@ public class OsmService
                         RoofColour = roofInfo.RoofColour,
                         RoofType = roofInfo.RoofType,
                         RoofHeight = roofInfo.RoofHeight,
-                        IsLarge = largeTileResult.IsLarge
+                        IsLarge = largeTileResult.IsLarge,
+                        Is3d = is3d,
                     };
 
                     databaseAreas.Add(relationArea);
@@ -343,6 +349,59 @@ public class OsmService
             await sqliteStore.SaveTileAreaMap(largeTilesDict);
             await sqliteStore.SaveWayParents(areaWayParentDict);
         }
+    }
+
+    private async Task Deduplicate3dBuildings()
+    {
+        // TODO fix https://www.openstreetmap.org/way/172645316
+        // That refers to London Hippodrome, an ordinary flat building.
+        // Unforunately, it is partially intersected by https://www.openstreetmap.org/way/995954637,
+        // which has a different colour. If the flat building is removed, a large chunk of the building
+        // is not represented. If it stays, texture fighting happens in the app. THe polygon probably needs
+        // bisecting, but that seems like a lot of work.
+
+        var runBatch = async (IEnumerable<Area> area3dsBatch) =>
+        {
+            if (area3dsBatch.Count() == 0)
+            {
+                return 0;
+            }
+            var tileIds = area3dsBatch.SelectMany(a => new[] { a.TileId }.Concat(tileService.CalcAllTileIds(a.OuterCoordinates))).Distinct().OrderBy(t => t).ToArray();
+
+            // tile id arg only referes to average tile for a building, maybe inaccuate?
+            var flatAreas = await sqliteStore.FetchAreas(null, tileIds)
+            .Where(a => !a.Is3d && a.Height > 0.2)
+            .ToArrayAsync();
+
+            var overlaps = new List<long>();
+            foreach (var flatArea in flatAreas)
+            {
+                // is 3d area contained?
+                if (flatArea.OuterCoordinates[0].AreaContainsAreas(area3dsBatch.Select(a => a.OuterCoordinates[0])))
+                {
+                    overlaps.Add(flatArea.Id);
+                    //Console.WriteLine($"    dedup {flatArea.Source}");
+                }
+            }
+            await sqliteStore.UpdateAreaVisibility(false, overlaps.ToArray());
+            return overlaps.Count;
+
+        };
+
+        int totalDeduplications = 0;
+        var area3dsBatch = new List<Area>();
+        await foreach (var area in sqliteStore.FetchAreas().Where(a => a.Is3d))
+        {
+            area3dsBatch.Add(area);
+
+            if (area3dsBatch.Count > 1000)
+            {
+                totalDeduplications += await runBatch(area3dsBatch);
+                area3dsBatch.Clear();
+            }
+        }
+        totalDeduplications += await runBatch(area3dsBatch);
+        Console.WriteLine($"Found {totalDeduplications} duplications.");
     }
 
     private async Task SaveAreaBatch(IEnumerable<Way> ways)
@@ -387,6 +446,7 @@ public class OsmService
                 var largeTileResult = tileService.CalcLargeTileRange(orderedCoords);
                 var heightResult = heightService.CalcBuildingHeight(wayTags);
                 var roofInfo = heightService.FetchRoofInfo(wayTags);
+                var is3d = heightService.Is3dBuilding(wayTags);
 
                 string name = wayTags.GetValueOrDefault("name", "");
                 int layer = 0;
@@ -397,7 +457,7 @@ public class OsmService
                 var wayArea = new Area
                 {
                     Source = $"way-{way.Id}",
-                    Visible = way.Visible,
+                    Visible = way.Visible ?? true,
                     Version = way.Version,
                     ChangeSet = way.ChangeSet,
                     Timestamp = way.Timestamp,
@@ -414,7 +474,8 @@ public class OsmService
                     RoofColour = roofInfo.RoofColour,
                     RoofType = roofInfo.RoofType,
                     RoofHeight = roofInfo.RoofHeight,
-                    IsLarge = largeTileResult.IsLarge
+                    IsLarge = largeTileResult.IsLarge,
+                    Is3d = is3d
                 };
 
                 databaseAreas.Add(wayArea);
@@ -519,7 +580,7 @@ public class OsmService
                 var highwayArea = new Area
                 {
                     Source = $"way-{way.Id}",
-                    Visible = way.Visible,
+                    Visible = way.Visible ?? true,
                     Version = way.Version,
                     ChangeSet = way.ChangeSet,
                     Timestamp = way.Timestamp,
@@ -536,7 +597,8 @@ public class OsmService
                     RoofColour = roofInfo.RoofColour,
                     RoofType = roofInfo.RoofType,
                     RoofHeight = roofInfo.RoofHeight,
-                    IsLarge = false
+                    IsLarge = false,
+                    Is3d = false
                 };
 
                 databaseAreas.Add(highwayArea);

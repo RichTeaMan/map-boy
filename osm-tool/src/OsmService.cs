@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Data;
 using OsmTool.Models;
 
@@ -360,6 +361,7 @@ public class OsmService
         // is not represented. If it stays, texture fighting happens in the app. THe polygon probably needs
         // bisecting, but that seems like a lot of work.
 
+
         var runBatch = async (IEnumerable<Area> area3dsBatch) =>
         {
             if (area3dsBatch.Count() == 0)
@@ -373,8 +375,8 @@ public class OsmService
             .Where(a => !a.Is3d && a.Height > 0.2)
             .ToArrayAsync();
 
-            var overlaps = new List<long>();
-            foreach (var flatArea in flatAreas)
+            var overlaps = new ConcurrentBag<long>();
+            Parallel.ForEach(flatAreas, flatArea =>
             {
                 // is 3d area contained?
                 if (flatArea.OuterCoordinates[0].AreaContainsAreas(area3dsBatch.Select(a => a.OuterCoordinates[0])))
@@ -382,10 +384,9 @@ public class OsmService
                     overlaps.Add(flatArea.Id);
                     //Console.WriteLine($"    dedup {flatArea.Source}");
                 }
-            }
+            });
             await sqliteStore.UpdateAreaVisibility(false, overlaps.ToArray());
             return overlaps.Count;
-
         };
 
         int totalDeduplications = 0;

@@ -230,8 +230,7 @@ static func create_area_node(area) -> MapAreaNode:
     if area.height > 0.5:
         area_colour = "polygon-%s" % area_colour
         y_position = area.minHeight
-    var position = Vector2(area.outerCoordinates[0][0].lat * Global.coord_factor, area.outerCoordinates[0][0].lon * Global.coord_factor)
-    var position_unscaled = Vector2(area.outerCoordinates[0][0].lat, area.outerCoordinates[0][0].lon)
+    var position = c(area.outerCoordinates[0][0].lat, area.outerCoordinates[0][0].lon)
     
     var map_area_node = MapAreaNode.new()
     map_area_node.name = "area-%s" % area.id
@@ -243,7 +242,7 @@ static func create_area_node(area) -> MapAreaNode:
             continue
         var vertices := PackedVector2Array()
         for c in coordinates:
-            var coord_vector = Vector2(c.lat * Global.coord_factor, c.lon * Global.coord_factor)
+            var coord_vector = c(c.lat, c.lon)
             vertices.append(coord_vector - position)
         inner_zones.append(vertices)
         if inner_zones.size() > 10:
@@ -259,8 +258,7 @@ static func create_area_node(area) -> MapAreaNode:
         var vertices := PackedVector2Array()
         
         for c in coordinates:
-            var coord_vector = Vector2(c.lat, c.lon)
-            var adj = (coord_vector - position_unscaled) * Global.coord_factor
+            var adj = c(c.lat, c.lon) - position
             #print("%s,%s"%[coord_vector.x, coord_vector.y])
             #print("%s,%s"%[adj.x, adj.y])
             vertices.append(adj)
@@ -312,6 +310,9 @@ static func create_area_node(area) -> MapAreaNode:
                     max_lon = c.lon
                 if c.lon < min_lon:
                     min_lon = c.lon
-        map_area_node.min_vert = Vector2(Global.coord_factor * min_lat, Global.coord_factor * min_lon)
-        map_area_node.max_vert = Vector2(Global.coord_factor * max_lat, Global.coord_factor * max_lon)
+        map_area_node.min_vert = c(min_lat, min_lon)
+        map_area_node.max_vert = c(max_lat, max_lon)
     return map_area_node
+
+static func c(lat: float, lon: float) -> Vector2:
+    return Global.lat_lon_to_vector(lat, lon)

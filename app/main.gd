@@ -18,12 +18,10 @@ var purge_amount = 500
 var load_window = 0.02
 
 func _ready():
-    
-    var avg_lat = 51.4995145764631 * Global.coord_factor
-    var avg_lon = -0.126637687351658 * Global.coord_factor
-    %cameras.position.x = avg_lat
+    var start = Global.lat_lon_to_vector(51.4995145764631, -0.126637687351658)
+    %cameras.position.x = start.x
     %satellite_camera.position.y = 10.0
-    %cameras.position.z = avg_lon
+    %cameras.position.z = start.y
     
     #$Camera3D.look_at(Vector3(avg_lat, 0.0, avg_lon), Vector3(0,1,0))
     
@@ -150,8 +148,12 @@ func refresh_tile_queue():
     
     # search for tiles 0.1 degrees around camera postion, which is very roughly similar to 1.7km
     var deg_range = load_window
-    var current_lat = %cameras.position.x / Global.coord_factor
-    var current_lon = %cameras.position.z / Global.coord_factor
+    #var current_lat = %cameras.position.x / Global.coord_factor
+    #var current_lon = %cameras.position.z / Global.coord_factor
+
+    var camera_coord = Global.vector_to_lat_lon(Vector2(%cameras.position.x, %cameras.position.z))
+    var current_lat =  camera_coord.x
+    var current_lon =  camera_coord.y
     
     if last_pos_lat == current_lat && last_pos_long == current_lon:
         return
@@ -172,7 +174,8 @@ func purge_map_area_nodes():
     var deg_range = load_window * Global.coord_factor * 2.0
     var current_lat = %cameras.position.x
     var current_lon = %cameras.position.z
-    
+
+        
     var lat1 = current_lat - deg_range
     var lon1 = current_lon - deg_range
     var lat2 = current_lat + deg_range
@@ -236,7 +239,7 @@ func _on_tiles_http_request_request_completed(_result, _response_code, _headers,
         var tile_id: int = tile.id
         if loaded_tiles.has(tile_id):
             continue
-        var tile_info = { tile_id = tile_id, tile_position = Vector3(tile.lat * Global.coord_factor, 0.0, tile.lon * Global.coord_factor)}
+        var tile_info = { tile_id = tile_id, tile_position = Global.lat_lon_to_vector3(tile.lat, 0.0, tile.lon)}
         
         var tile_markers = $tile_markers
         var callback_fn = func():
@@ -258,5 +261,6 @@ func _on_tiles_http_request_request_completed(_result, _response_code, _headers,
     tiles_pending = false
 
 func _on_teleport(lat: float, lon: float):
-    %cameras.position.x = lat * Global.coord_factor
-    %cameras.position.z = lon * Global.coord_factor
+    var v2 = Global.lat_lon_to_vector(lat, lon)
+    %cameras.position.x = v2.x
+    %cameras.position.z = v2.y

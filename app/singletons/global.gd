@@ -17,3 +17,19 @@ func _process(delta: float) -> void:
 
 func do_teleport(lat: float, lon: float):
     teleport.emit(lat, lon)
+
+func lat_lon_to_vector(lat: float, lon: float) -> Vector2:
+    var lon_length = 40_075_000 * cos(lat / 180.0 * PI) / 360
+    var r = Vector2(lat * 111320, lon * lon_length )
+    #var r = Vector2(lat, lon) * coord_factor
+    return r
+
+func vector_to_lat_lon(v: Vector2) -> Vector2:
+    var lat = v.x / 111320
+    var lon_length = 40_075_000 * cos(lat / 180.0 * PI) / 360
+    return Vector2(lat, v.y / lon_length)
+    #return Vector2(v.x / Global.coord_factor, v.y / Global.coord_factor)
+
+func lat_lon_to_vector3(lat: float, height: float, lon: float) -> Vector3:
+    var v2 = lat_lon_to_vector(lat, lon)
+    return Vector3(v2.x, height, v2.y)

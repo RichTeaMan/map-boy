@@ -81,6 +81,7 @@ public class Area
     public double RoofHeight { get; set; }
     public required string RoofType { get; set; }
     public required string RoofColour { get; set; }
+    public required string RoofOrientation { get; set; }
     public bool IsLarge { get; set; }
 
     public bool Is3d { get; set; }
@@ -335,6 +336,7 @@ public class OsmService
                         RoofColour = roofInfo.RoofColour,
                         RoofType = roofInfo.RoofType,
                         RoofHeight = roofInfo.RoofHeight,
+                        RoofOrientation = roofInfo.RoofOrientation,
                         IsLarge = largeTileResult.IsLarge,
                         Is3d = is3d,
                     };
@@ -475,6 +477,7 @@ public class OsmService
                     RoofColour = roofInfo.RoofColour,
                     RoofType = roofInfo.RoofType,
                     RoofHeight = roofInfo.RoofHeight,
+                    RoofOrientation = roofInfo.RoofOrientation,
                     IsLarge = largeTileResult.IsLarge,
                     Is3d = is3d
                 };
@@ -598,6 +601,7 @@ public class OsmService
                     RoofColour = roofInfo.RoofColour,
                     RoofType = roofInfo.RoofType,
                     RoofHeight = roofInfo.RoofHeight,
+                    RoofOrientation = roofInfo.RoofOrientation,
                     IsLarge = false,
                     Is3d = false
                 };

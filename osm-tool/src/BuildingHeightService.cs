@@ -12,13 +12,16 @@ public class RoofInfo
     public double RoofHeight { get; set; }
     public required string RoofColour { get; set; }
 
+    public required string RoofOrientation { get; set; }
+
     public static RoofInfo Default()
     {
         return new RoofInfo
         {
             RoofColour = "",
             RoofType = "",
-            RoofHeight = 0.0
+            RoofHeight = 0.0,
+            RoofOrientation = "",
         };
     }
 }
@@ -149,6 +152,7 @@ public class BuildingHeightService
         string resultRoofColour = "";
         string resultRoofType = "";
         double resultRoofHeight = 0.0;
+        string resultRoofOrientation = "";
         if (tags.TryGetValue("roof:colour", out string? roofColour))
         {
             resultRoofColour = roofColour;
@@ -166,11 +170,17 @@ public class BuildingHeightService
                 resultRoofHeight = roofHeight;
             }
         }
+
+        if (tags.TryGetValue("roof:orientation", out string? roofOrientation))
+        {
+            resultRoofOrientation = roofOrientation;
+        }
         return new RoofInfo
         {
             RoofColour = resultRoofColour,
             RoofType = resultRoofType,
-            RoofHeight = resultRoofHeight
+            RoofHeight = resultRoofHeight,
+            RoofOrientation = resultRoofOrientation,
         };
     }
 

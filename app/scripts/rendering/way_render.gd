@@ -2,6 +2,10 @@ class_name WayRender
 
 static var material_map = {}
 
+static func print_vertor2s(coordinates: Array[Vector2]):
+    for c in coordinates:
+        print("%s,%s"%[c.x, c.y])
+
 static func fetch_outline_material():
     var shader_material = material_map.get("outline-mat")
     if shader_material == null:
@@ -32,7 +36,7 @@ static func fetch_material(colour: String):
             "blue":
                 material.albedo_color = Color.LIGHT_BLUE
             "white":
-                material.albedo_color = Color.FLORAL_WHITE
+                material.albedo_color = Color.WHITE
             "green":
                 material.albedo_color = Color.LIGHT_GREEN
             "dark-green":
@@ -63,6 +67,49 @@ static func fetch_material(colour: String):
                 material.albedo_color = Color.html(cleaned_colour)
         material_map[colour] = material
     return material
+
+static func calc_average(polygon_points: PackedVector2Array) -> Vector2:
+    var cumm = Vector2()
+    for p in polygon_points:
+        cumm += p
+    return cumm / polygon_points.size()
+
+## Calculates corners by finding 4 furthest points from the average.
+## Is this mathematically accurate? Probably not, but we're rolling with it.
+## 
+## Corners are returned in the order they are orignally in the parameter.
+## Returns empty array if something went wrong
+static func calc_corners(polygon_points: PackedVector2Array) -> PackedVector2Array:
+    var num = 4
+    if polygon_points.size() < num:
+        printerr("calc_corners: Polygon does not have %s corners." % num)
+        return PackedVector2Array()
+    var average = calc_average(polygon_points)
+    var distances = []
+    var polygon_length = polygon_points.size()
+    # head and tail are ususally the same coord (always the same?)
+    if polygon_points[0] == polygon_points[polygon_length - 1]:
+        polygon_length -= 1
+    for i in range(polygon_length):
+        var p = polygon_points[i]
+        var distance_sqr = (p - average).length_squared()
+        distances.append({
+            "distance_sqr": distance_sqr,
+            "point": p,
+            "index": i
+        })
+    
+    distances.sort_custom(func (a,b): return a.distance_sqr > b.distance_sqr)
+    var corner_distances = []
+    var corners = PackedVector2Array()
+    for i in range(num):
+        corner_distances.append(distances[i])
+    corner_distances.sort_custom(func (a,b): return a.index < b.index)
+    for distance in corner_distances:
+        var point_index = distance.index
+        var point = polygon_points[point_index]
+        corners.append(point)
+    return corners
 
 static func create_2d_mesh_from_polygon(polygon_points: PackedVector2Array, inner_zones: Array[PackedVector2Array]) -> Array[ArrayMesh]:
 
@@ -115,6 +162,67 @@ static func create_3d_mesh_from_polygon(polygon_points: PackedVector2Array, heig
 
     return _generate_extruded_mesh(polygon_points, indices, height)
 
+## Draws an ellipse, filling the vertices and indices for a mesh. Returns points on the curved edge.
+## Seems to work best with an odd number for subdivisions.
+static func draw_ellipse(vertices: PackedVector3Array, indices: PackedInt32Array, subdivisions: int, height: float, a: Vector2, b: Vector2) -> Array[Vector3]:
+    var half_sub = subdivisions / 2
+    var jump: Vector2 = (b - a) / subdivisions
+    assert(b.is_equal_approx(a + (jump * subdivisions)))
+    
+    var width_sqr = (a - b).length_squared()
+    var width = (a - b).length()
+    
+    var ac := float(width / 2.0)
+    var bc := float(height)
+    var ac_sqr := pow(ac, 2)
+    
+    var centre_point_index = vertices.size()
+    var centre_point: Vector2 = a + (half_sub * jump)
+    vertices.append(Vector3(centre_point.x, 0.0, centre_point.y))
+    
+    var result: Array[Vector3] = []
+    var p_start = Vector3(a.x, 0.0, a.y)
+    result.append(p_start)
+    var roof_heights: Array[float] = []
+    var prev_height = 0.0
+    var prev_top_index = vertices.size()
+    vertices.append(p_start)
+    
+    for i in range(subdivisions - 1):
+        var ri = i + 1
+        var delta: Vector2 = ri * jump
+        var vert: Vector2 = a + delta
+        var h = 0.0
+        var x = ac - abs(delta.length())
+        if ri <= half_sub:
+            h = ( bc * sqrt(ac_sqr - pow(x, 2)) ) / ac
+            roof_heights.append(h)
+        else:
+            h = roof_heights.pop_back()
+            assert(h != null)
+        print("[%s] a %s/%s | h %s/%s" % [ri, x, ac, h, bc])
+        var top_vert = Vector3(vert.x, h, vert.y)
+        result.append(top_vert)
+        
+        var top_index = vertices.size()
+        vertices.append(top_vert)
+        
+        indices.append(centre_point_index)
+        indices.append(prev_top_index)
+        indices.append(top_index)
+        
+        prev_height = h
+        prev_top_index = top_index
+
+    var p_end = Vector3(b.x, 0.0, b.y)
+    result.append(p_end)
+    indices.append(centre_point_index)
+    indices.append(prev_top_index)
+    indices.append(vertices.size())
+    vertices.append(p_end)
+    return result
+
+
 static func _generate_roof_mesh(polygon_points: PackedVector2Array, area) -> ArrayMesh:
     if (area.roofType == "pyramidal"):
         var roof_vertices = PackedVector3Array()
@@ -139,6 +247,81 @@ static func _generate_roof_mesh(polygon_points: PackedVector2Array, area) -> Arr
         arrays.resize(Mesh.ARRAY_MAX)
         arrays[Mesh.ARRAY_VERTEX] = roof_vertices
         arrays[Mesh.ARRAY_INDEX] = roof_indices
+        var mesh = ArrayMesh.new()
+        mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+        return mesh
+    if (area.roofType == "round"):
+        var corners := calc_corners(polygon_points)
+        if !Geometry2D.is_polygon_clockwise(corners):
+            corners.reverse()
+        
+        var roofHeight = float(area.roofHeight)
+        
+        var s1 = (corners[0] - corners[1]).length_squared()
+        var s2 = (corners[1] - corners[2]).length_squared()
+        var p_index = 0
+        # along - midpoint of shortest side
+        if area.roofOrientation == "along":
+            if s1 < s2:
+                p_index = 0
+            else:
+                p_index = 1
+        # across - midpoint of longest side
+        elif area.roofOrientation == "across":
+            if s1 > s2:
+                p_index = 0
+            else:
+                p_index = 1
+        else:
+            printerr("Unknown roof orientation: %s" % area.roofOrientation)
+        
+        var vertices := PackedVector3Array()
+        var indices := PackedInt32Array()
+        var curve_points_1 = draw_ellipse(
+            vertices,
+            indices,
+            7,
+            roofHeight,
+            corners[(p_index) % corners.size()],
+            corners[(p_index + 1) % corners.size()])
+        var curve_points_2 = draw_ellipse(
+            vertices,
+            indices,
+            7,
+            roofHeight,
+            corners[(p_index + 2) % corners.size()],
+            corners[(p_index + 3) % corners.size()])
+        curve_points_2.reverse()
+        
+        if curve_points_1.size() != curve_points_2.size():
+            printerr("Curves have different number of points")
+            return null
+        
+        for i in range(curve_points_1.size() - 1):
+            continue
+            var base_v_index = vertices.size()
+            var v1 = curve_points_1[i]
+            var v2 = curve_points_1[i + 1]
+            var v3 = curve_points_2[i]
+            var v4 = curve_points_2[i + 1]
+            
+            vertices.append(v1)
+            vertices.append(v2)
+            vertices.append(v3)
+            vertices.append(v4)
+            
+            indices.append(base_v_index)
+            indices.append(base_v_index + 2)
+            indices.append(base_v_index + 3)
+            
+            indices.append(base_v_index)
+            indices.append(base_v_index + 3)
+            indices.append(base_v_index + 1)
+        
+        var arrays : Array = []
+        arrays.resize(Mesh.ARRAY_MAX)
+        arrays[Mesh.ARRAY_VERTEX] = vertices
+        arrays[Mesh.ARRAY_INDEX] = indices
         var mesh = ArrayMesh.new()
         mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
         return mesh
@@ -233,7 +416,7 @@ static func create_area_node(area) -> MapAreaNode:
     var position = c(area.outerCoordinates[0][0].lat, area.outerCoordinates[0][0].lon)
     
     var map_area_node = MapAreaNode.new()
-    map_area_node.name = "area-%s" % area.id
+    map_area_node.name = "area_%s_[%s]" % [ area.id, area.source ]
     
     var inner_zones: Array[PackedVector2Array] = []
     for coordinates in area.innerCoordinates:

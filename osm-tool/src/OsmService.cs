@@ -71,7 +71,7 @@ public class Area
     public long? Uid { get; set; }
     public required Coord[][] OuterCoordinates { get; set; }
     public required Coord[][] InnerCoordinates { get; set; }
-    public string? Name { get; set; }
+    public required string[] Names { get; set; }
     public required string SuggestedColour { get; set; }
     public long TileId { get; set; }
     public int Layer { get; set; }
@@ -128,19 +128,31 @@ public class OsmService
         await Deduplicate3dBuildings();
     }
 
+    private string[] FetchAreaNames(Dictionary<string, string> tags)
+    {
+        var tagNames = new string[] { "name", "official_name", "alt_name", "loc_name", "nickname", "old_name" };
+        return tagNames
+            .Select(t => tags.GetValueOrDefault(t, ""))
+            .Where(t => !string.IsNullOrWhiteSpace(t))
+            .Distinct()
+            .ToArray();
+    }
+
     private void BuildSearchIndex()
     {
-
         locationSearch.InitIndex();
-
-        var searchIndexEntries = sqliteStore.FetchAreas().Where(a => !string.IsNullOrWhiteSpace(a?.Name) && a?.OuterCoordinates?.FirstOrDefault()?.FirstOrDefault() != null)
-        .Select(area =>
-        {
-            string areaName = area.Name!;
-            var coord = area?.OuterCoordinates?.FirstOrDefault()?.FirstOrDefault()!;
-            return new SearchIndexEntry { Name = areaName, Lat = coord.Lat, Lon = coord.Lon };
-        });
-        locationSearch.UpdateIndex(searchIndexEntries.ToEnumerable());
+        var searchIndexEntries = sqliteStore.FetchAreas()
+            .Where(a => a.Names.Length > 0 && a?.OuterCoordinates?.FirstOrDefault()?.FirstOrDefault() != null)
+            .ToEnumerable()
+            .SelectMany(area =>
+            {
+                return area.Names.Select(name =>
+                {
+                    var coord = area?.OuterCoordinates?.FirstOrDefault()?.FirstOrDefault()!;
+                    return new SearchIndexEntry { Name = name, Lat = coord.Lat, Lon = coord.Lon };
+                });
+            });
+        locationSearch.UpdateIndex(searchIndexEntries);
     }
 
     public async Task SaveNodes(IReader reader)
@@ -296,56 +308,68 @@ public class OsmService
                 }
 
                 string suggestedColour = suggestedColourService.CalcSuggestedColour(relation.Tags);
-                if (suggestedColour == "unknown")
+                var names = FetchAreaNames(relation.Tags);
+                var coords = loopCoords.ToArray();
+                var visible = relation.Visible ?? true;
+                if (suggestedColour == SuggestedColourService.UNKNOWN_COLOUR)
                 {
                     Console.WriteLine($"Relation {relation.Id} has an unknown colour, skipping.");
+                    continue;
                 }
-                else if (suggestedColour != SuggestedColourService.NO_COLOUR)
+                if (suggestedColour == SuggestedColourService.NO_COLOUR)
                 {
-                    var coords = loopCoords.ToArray();
-                    var innerCoords = innerWays.Select(w => Coord.FromNodes(wayNodes[w.Id])).ToArray();
-                    var largeTileResult = tileService.CalcLargeTileRange(coords);
-                    var heightResult = heightService.CalcBuildingHeight(relation.Tags);
-                    var tileId = tileService.CalcTileId(coords);
-                    var is3d = heightService.Is3dBuilding(relation.Tags);
-                    var roofInfo = RoofInfo.Default();
-
-                    string name = relation.Tags.GetValueOrDefault("name", "");
-                    int layer = 0;
-                    if (int.TryParse(relation.Tags.GetValueOrDefault("layer", "0"), out int _layer))
+                    // some areas aren't rendered, but have useful meta data.
+                    if (names.Length > 0 && coords.Length > 1)
                     {
-                        layer = _layer;
+                        coords = [[new Coord(coords[0].Average(n => n.Lat), coords[0].Average(n => n.Lon))]];
+                        visible = false;
                     }
-                    var relationArea = new Area
+                    else
                     {
-                        Source = $"relation-{relation.Id}",
-                        Visible = relation.Visible ?? true,
-                        Version = relation.Version,
-                        ChangeSet = relation.ChangeSet,
-                        Timestamp = relation.Timestamp,
-                        User = relation.User,
-                        Uid = relation.Uid,
-                        OuterCoordinates = coords,
-                        InnerCoordinates = innerCoords,
-                        Name = name,
-                        SuggestedColour = suggestedColour,
-                        TileId = tileId,
-                        Layer = layer,
-                        Height = heightResult.Height,
-                        MinHeight = heightResult.MinHeight,
-                        RoofColour = roofInfo.RoofColour,
-                        RoofType = roofInfo.RoofType,
-                        RoofHeight = roofInfo.RoofHeight,
-                        RoofOrientation = roofInfo.RoofOrientation,
-                        IsLarge = largeTileResult.IsLarge,
-                        Is3d = is3d,
-                    };
-
-                    databaseAreas.Add(relationArea);
-                    if (largeTileResult.IsLarge)
-                    {
-                        largeTilesDict.Add(relationArea.Source, largeTileResult.Tiles.Select(t => t.Id).ToArray());
+                        continue;
                     }
+                }
+                var innerCoords = innerWays.Select(w => Coord.FromNodes(wayNodes[w.Id])).ToArray();
+                var largeTileResult = tileService.CalcLargeTileRange(coords);
+                var heightResult = heightService.CalcBuildingHeight(relation.Tags);
+                var tileId = tileService.CalcTileId(coords);
+                var is3d = heightService.Is3dBuilding(relation.Tags);
+                var roofInfo = RoofInfo.Default();
+
+                int layer = 0;
+                if (int.TryParse(relation.Tags.GetValueOrDefault("layer", "0"), out int _layer))
+                {
+                    layer = _layer;
+                }
+                var relationArea = new Area
+                {
+                    Source = $"relation-{relation.Id}",
+                    Visible = visible,
+                    Version = relation.Version,
+                    ChangeSet = relation.ChangeSet,
+                    Timestamp = relation.Timestamp,
+                    User = relation.User,
+                    Uid = relation.Uid,
+                    OuterCoordinates = coords,
+                    InnerCoordinates = innerCoords,
+                    Names = names,
+                    SuggestedColour = suggestedColour,
+                    TileId = tileId,
+                    Layer = layer,
+                    Height = heightResult.Height,
+                    MinHeight = heightResult.MinHeight,
+                    RoofColour = roofInfo.RoofColour,
+                    RoofType = roofInfo.RoofType,
+                    RoofHeight = roofInfo.RoofHeight,
+                    RoofOrientation = roofInfo.RoofOrientation,
+                    IsLarge = largeTileResult.IsLarge,
+                    Is3d = is3d,
+                };
+
+                databaseAreas.Add(relationArea);
+                if (largeTileResult.IsLarge)
+                {
+                    largeTilesDict.Add(relationArea.Source, largeTileResult.Tiles.Select(t => t.Id).ToArray());
                 }
             }
             await sqliteStore.SaveAreaBatch(databaseAreas);
@@ -434,6 +458,8 @@ public class OsmService
                     continue;
                 }
                 var wayTags = way.TagsToDict();
+                var names = FetchAreaNames(wayTags);
+                var visible = way.Visible ?? true;
 
                 string suggestedColour = suggestedColourService.CalcSuggestedColour(wayTags);
                 if (suggestedColour == SuggestedColourService.UNKNOWN_COLOUR)
@@ -443,7 +469,16 @@ public class OsmService
                 }
                 else if (suggestedColour == SuggestedColourService.NO_COLOUR)
                 {
-                    continue;
+                    // some areas aren't rendered, but have useful meta data.
+                    if (names.Length > 0)
+                    {
+                        orderedCoords = [new Coord(orderedCoords.Average(n => n.Lat), orderedCoords.Average(n => n.Lon))];
+                        visible = false;
+                    }
+                    else
+                    {
+                        continue;
+                    }
                 }
 
                 var largeTileResult = tileService.CalcLargeTileRange(orderedCoords);
@@ -451,7 +486,6 @@ public class OsmService
                 var roofInfo = heightService.FetchRoofInfo(wayTags);
                 var is3d = heightService.Is3dBuilding(wayTags);
 
-                string name = wayTags.GetValueOrDefault("name", "");
                 int layer = 0;
                 if (int.TryParse(wayTags.GetValueOrDefault("layer", "0"), out int _layer))
                 {
@@ -460,7 +494,7 @@ public class OsmService
                 var wayArea = new Area
                 {
                     Source = $"way-{way.Id}",
-                    Visible = way.Visible ?? true,
+                    Visible = visible,
                     Version = way.Version,
                     ChangeSet = way.ChangeSet,
                     Timestamp = way.Timestamp,
@@ -468,7 +502,7 @@ public class OsmService
                     Uid = way.Uid,
                     OuterCoordinates = new[] { orderedCoords.ToArray() },
                     InnerCoordinates = Array.Empty<Coord[]>(),
-                    Name = name,
+                    Names = names,
                     SuggestedColour = suggestedColour,
                     TileId = tileService.CalcTileId(orderedCoords.Average(n => n.Lat), orderedCoords.Average(n => n.Lon)),
                     Layer = layer,
@@ -575,7 +609,6 @@ public class OsmService
                 var tile = tileService.CalcTileId(orderedCoords.Average(n => n.Lat), orderedCoords.Average(n => n.Lon));
                 var roofInfo = RoofInfo.Default();
 
-                string name = wayTags.GetValueOrDefault("name", "");
                 int layer = 0;
                 if (int.TryParse(wayTags.GetValueOrDefault("layer", "0"), out int _layer))
                 {
@@ -592,7 +625,7 @@ public class OsmService
                     Uid = way.Uid,
                     OuterCoordinates = new[] { highwayCoords.ToArray() },
                     InnerCoordinates = Array.Empty<Coord[]>(),
-                    Name = name,
+                    Names = FetchAreaNames(wayTags),
                     SuggestedColour = suggestedColour,
                     TileId = tile,
                     Layer = layer,

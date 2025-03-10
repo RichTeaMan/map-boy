@@ -1,12 +1,60 @@
-using System.Net.WebSockets;
-
 namespace OsmTool;
 
 public static class DictUtils
 {
     private static readonly char[] DICT_SEPARATORS = [';', '|', '#', '@', '~', '!'];
 
-    public static string DictToString(Dictionary<string, string> dict)
+
+    public static string ArrayToString(this string[] list)
+    {
+        if (list == null || list.Length == 0)
+        {
+            return "";
+        }
+
+        char? separator = null;
+        foreach (var sep in DICT_SEPARATORS)
+        {
+            bool hasSeparator = false;
+            foreach (var part in list)
+            {
+                if (part.Contains(sep))
+                {
+                    hasSeparator = true;
+                    break;
+                }
+            }
+            if (!hasSeparator)
+            {
+                separator = sep;
+                break;
+            }
+        }
+
+        if (separator == null)
+        {
+            throw new Exception("No suitable separator found for list");
+        }
+
+        return $"{separator}{string.Join(separator.ToString(), list)}";
+    }
+
+    public static string[] StringToArray(this string str)
+    {
+        if (str == null || str.Length <= 1)
+        {
+            return [];
+        }
+
+        char separator = str[0];
+
+        string[] parts = str.Substring(1).Split(separator);
+        return parts;
+    }
+
+
+
+    public static string DictToString(this Dictionary<string, string> dict)
     {
         if (dict == null || dict.Count == 0)
         {
@@ -46,7 +94,7 @@ public static class DictUtils
         return $"{separator}{string.Join(separator.ToString(), parts)}";
     }
 
-    public static Dictionary<string, string> StringToDict(string str)
+    public static Dictionary<string, string> StringToDict(this string str)
     {
         if (str == null || str.Length <= 1)
         {

@@ -2,10 +2,15 @@ using OsmTool;
 
 public class Program
 {
+    private static string FetchDatabasePath() {
+        var dbFilePath = Environment.GetEnvironmentVariable("DB_FILE_PATH") ?? "osm.db";
+        return dbFilePath;
+    }
 
     private static SqliteStore CreateSqliteStore()
     {
-        return new SqliteStore("osm.db");
+        var dbFilePath = FetchDatabasePath();
+        return new SqliteStore(dbFilePath);
     }
 
     private static ILocationSearch? locationSearch;
@@ -21,7 +26,15 @@ public class Program
 
     public static void Main(string[] args)
     {
+        Console.WriteLine("Starting OSM API...");
         var builder = WebApplication.CreateBuilder(args);
+
+        Console.WriteLine($"DB_FILE_PATH: {Environment.GetEnvironmentVariable("DB_FILE_PATH")}");
+        Console.WriteLine($"Reading database from path '{FetchDatabasePath()}'.");
+        if (!Path.Exists(FetchDatabasePath())) {
+            Console.Error.WriteLine($"Database not accessible from path '{FetchDatabasePath()}', quitting.");
+            return;
+        }
 
         // Add services to the container.
         // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi

@@ -47,10 +47,19 @@ public class Program
         // Configure the HTTP request pipeline.
         if (app.Environment.IsDevelopment())
         {
+            // http://localhost:5291/openapi/v1.json
             app.MapOpenApi();
         }
 
         app.UseHttpsRedirection();
+        app.Use(async (context, next) => {
+
+            var startTime = DateTimeOffset.Now;
+            await next(context);
+            var endTime = DateTimeOffset.Now;
+            var duration = endTime - startTime;
+            Console.WriteLine($"[{DateTimeOffset.Now}] {context.Request.Path} - {context.Response.StatusCode} {duration.TotalMilliseconds:0.##}ms");
+        });
 
         app.MapGet("/", async (httpContext) =>
         {

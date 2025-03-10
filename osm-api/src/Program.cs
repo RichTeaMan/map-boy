@@ -2,7 +2,8 @@ using OsmTool;
 
 public class Program
 {
-    private static string FetchDatabasePath() {
+    private static string FetchDatabasePath()
+    {
         var dbFilePath = Environment.GetEnvironmentVariable("DB_FILE_PATH") ?? "osm.db";
         return dbFilePath;
     }
@@ -31,7 +32,8 @@ public class Program
 
         Console.WriteLine($"DB_FILE_PATH: {Environment.GetEnvironmentVariable("DB_FILE_PATH")}");
         Console.WriteLine($"Reading database from path '{FetchDatabasePath()}'.");
-        if (!Path.Exists(FetchDatabasePath())) {
+        if (!Path.Exists(FetchDatabasePath()))
+        {
             Console.Error.WriteLine($"Database not accessible from path '{FetchDatabasePath()}', quitting.");
             return;
         }
@@ -49,6 +51,12 @@ public class Program
         }
 
         app.UseHttpsRedirection();
+
+        app.MapGet("/", async (httpContext) =>
+        {
+            await httpContext.Response.WriteAsync("OK");
+        })
+        .WithName("Home");
 
         app.MapGet("/areas", async (httpContext) =>
         {

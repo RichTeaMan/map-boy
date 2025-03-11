@@ -4,5 +4,6 @@ EXPOSE 8443
 ENV DB_FILE_PATH=osm.db
 
 COPY bin/published/ .
+COPY static-files/ static-files
 RUN dotnet dev-certs https
 ENTRYPOINT [ "dotnet", "osm-api.dll", "--urls=https://*:8443;http://*:8080"]

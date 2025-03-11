@@ -1,3 +1,4 @@
+using Microsoft.Extensions.FileProviders;
 using OsmTool;
 
 public class Program
@@ -51,8 +52,16 @@ public class Program
             app.MapOpenApi();
         }
 
+        app.UseStaticFiles(new StaticFileOptions
+        {
+            FileProvider = new PhysicalFileProvider(Path.Combine(builder.Environment.ContentRootPath, "static-files")),
+            ServeUnknownFileTypes = true,
+            RequestPath = "",
+        });
+
         app.UseHttpsRedirection();
-        app.Use(async (context, next) => {
+        app.Use(async (context, next) =>
+        {
 
             var startTime = DateTimeOffset.Now;
             await next(context);
@@ -61,13 +70,15 @@ public class Program
             Console.WriteLine($"[{DateTimeOffset.Now}] {context.Request.Path} - {context.Response.StatusCode} {duration.TotalMilliseconds:0.##}ms");
         });
 
-        app.MapGet("/", async (httpContext) =>
+        var apiPath = app.MapGroup("/api");
+
+        apiPath.MapGet("/", async (httpContext) =>
         {
             await httpContext.Response.WriteAsync("OK");
         })
         .WithName("Home");
 
-        app.MapGet("/areas", async (httpContext) =>
+        apiPath.MapGet("/areas", async (httpContext) =>
         {
             var store = CreateSqliteStore();
             long[]? tileIds = null;
@@ -95,7 +106,7 @@ public class Program
         })
         .WithName("GetAreas");
 
-        app.MapGet("/areasByIds", async (httpContext) =>
+        apiPath.MapGet("/areasByIds", async (httpContext) =>
         {
             var store = CreateSqliteStore();
             long[]? areaIds = null;
@@ -108,21 +119,21 @@ public class Program
         })
         .WithName("GetAreaByIds");
 
-        app.MapGet("/tileId/{lat:double}/{lon:double}", (double lat, double lon) =>
+        apiPath.MapGet("/tileId/{lat:double}/{lon:double}", (double lat, double lon) =>
         {
             var tileService = new TileService();
             return new { tileId = tileService.CalcTileId(lat, lon) };
         })
         .WithName("GetTileId");
 
-        app.MapGet("/tileIdRange/{lat1:double}/{lon1:double}/{lat2:double}/{lon2:double}", (double lat1, double lon1, double lat2, double lon2) =>
+        apiPath.MapGet("/tileIdRange/{lat1:double}/{lon1:double}/{lat2:double}/{lon2:double}", (double lat1, double lon1, double lat2, double lon2) =>
         {
             var tileService = new TileService();
             return new { tiles = tileService.CalcTileIdsInRangeSpiral(lat1, lon1, lat2, lon2).Reverse().ToArray() };
         })
         .WithName("GetTileIdRange");
 
-        app.MapGet("/search/{searchTerm}", (string searchTerm) =>
+        apiPath.MapGet("/search/{searchTerm}", (string searchTerm) =>
         {
             var store = CreateSearchIndex();
             return store.SearchAreas(searchTerm).Take(20).ToArray();

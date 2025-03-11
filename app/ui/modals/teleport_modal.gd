@@ -17,7 +17,7 @@ func _process(_delta: float) -> void:
     if !search_pending && new_search_required:
         new_search_required = false
         search_pending = true
-        %http_request.request("http://127.0.0.1:5291/search/%s" % %input_teleport.text.strip_edges())
+        %http_request.request(Api.search(%input_teleport.text.strip_edges()))
 
 func _on_input_changed(_new_text) -> void:
     if %input_teleport.text.strip_edges() == "":

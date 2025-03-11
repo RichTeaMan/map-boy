@@ -35,29 +35,12 @@ func _ready():
 func _process(delta: float):
     
     # load map
-    if false && !area_pending && area_queue.size() > 0:
-        var tile_info = area_queue.pop_front()
-        while(tile_info != null):
-            if loaded_tiles.has(tile_info.tile_id):
-                tile_info = area_queue.pop_front()
-                continue
-            #print("Requesting area for tile %s." % tile_id)
-            $areasHttpRequest.request("http://127.0.0.1:5291/areas?tileId=%s" % tile_info.tile_id)
-            area_pending = true
-            var tile_marker = TileMarkerNode.new()
-            tile_marker.tile_id = tile_info.tile_id
-            tile_marker.position = tile_info.tile_position
-            tile_marker.name = "tile-%s" % tile_info.tile_id
-            $tile_markers.add_child(tile_marker)
-            loaded_tiles[tile_info.tile_id] = true
-            break
-    
     while area_queue.size() > 0 && $areaHttpRequestPool.is_ready():
         var tile_info = area_queue.pop_front()
         if loaded_tiles.has(tile_info.tile_id):
             continue
         #print("Requesting area for tile %s." % tile_id)
-        $areaHttpRequestPool.request_now("http://127.0.0.1:5291/areas?tileId=%s" % tile_info.tile_id)
+        $areaHttpRequestPool.request_now(Api.get_areas_by_tile_id(tile_info.tile_id))
         var tile_marker = TileMarkerNode.new()
         tile_marker.tile_id = tile_info.tile_id
         tile_marker.position = tile_info.tile_position
@@ -70,7 +53,7 @@ func _process(delta: float):
         if loaded_large_area_ids.has(large_area_id):
             continue
         #print("Requesting area for tile %s." % tile_id)
-        $largeAreaHttpRequestPool.request_now("http://127.0.0.1:5291/areasByIds?ids=%s" % large_area_id)
+        $largeAreaHttpRequestPool.request_now(Api.get_areas_by_ids(large_area_id))
         var tile_marker = TileMarkerNode.new()
         loaded_large_area_ids[large_area_id] = true
     
@@ -162,7 +145,7 @@ func refresh_tile_queue():
     var lon1 = current_lon - deg_range
     var lat2 = current_lat + deg_range
     var lon2 = current_lon + deg_range
-    $tilesIdRangeHttpRequest.request("http://127.0.0.1:5291/tileIdRange/%s/%s/%s/%s" % [lat1, lon1, lat2, lon2])
+    $tilesIdRangeHttpRequest.request(Api.get_tile_id_range(lat1, lon1, lat2, lon2))
     tiles_pending = true
     
     last_pos_lat = current_lat
@@ -254,8 +237,6 @@ func _on_tiles_http_request_request_completed(_result, _response_code, _headers,
             return true
         
         area_queue.push_front(tile_info)
-        #$areaHttpRequestPool.submit_front("http://127.0.0.1:5291/areas?tileId=%s" % tile_info.tile_id, callback_fn)
-        
 
     #print("tile response processed")
     tiles_pending = false

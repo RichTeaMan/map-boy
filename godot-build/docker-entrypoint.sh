@@ -14,7 +14,7 @@ source /project/emsdk/emsdk_env.sh
 mkdir bin
 scons platform=linuxbsd float=64 precision=double production=yes
 scons platform=windows float=64 precision=double production=yes
-scons platform=web target=template_release
-scons platform=web target=template_debug
+scons platform=web target=template_release precision=double threads=no
+scons platform=web target=template_debug precision=double threads=no
 
 mv bin/* ../bin/.

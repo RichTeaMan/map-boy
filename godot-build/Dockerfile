@@ -32,4 +32,4 @@ RUN git clone --branch "4.0.4" --depth 1 https://github.com/emscripten-core/emsd
 
 COPY docker-entrypoint.sh docker-entrypoint.sh
 
-ENTRYPOINT ./docker-entrypoint.sh
+ENTRYPOINT [ "./docker-entrypoint.sh" ]

@@ -1,0 +1,31 @@
+[gd_scene load_steps=2 format=3 uid="uid://bcjhed8jlyynu"]
+
+[ext_resource type="Script" uid="uid://sjk6amjuej8n" path="res://singletons/build_info.gd" id="1"]
+
+[node name="build_info" type="CanvasLayer"]
+layer = 128
+script = ExtResource("1")
+
+[node name="gui" type="MarginContainer" parent="."]
+offset_right = 1918.0
+offset_bottom = 40.0
+mouse_filter = 2
+
+[node name="build_label" type="RichTextLabel" parent="gui"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+
+[node name="MarginContainer" type="MarginContainer" parent="."]
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -116.0
+offset_bottom = 40.0
+grow_horizontal = 0
+
+[node name="fps_label" type="RichTextLabel" parent="MarginContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "FPS: 0"
+horizontal_alignment = 2

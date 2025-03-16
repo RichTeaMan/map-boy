@@ -552,4 +552,30 @@ public class SqliteStore : ILocationSearch
         }
         await transaction.CommitAsync();
     }
+
+    public Task<long> FetchSizeBytes() {
+        var length = new FileInfo(FilePath).Length;
+        return Task.FromResult(length);
+    }
+
+    public async Task ClearNodes() {
+        using var connection = createConnection();
+        using var deleteNodeCommand = connection.CreateCommand();
+        deleteNodeCommand.CommandText = @"DELETE FROM node;";
+        await deleteNodeCommand.ExecuteNonQueryAsync();
+    }
+
+    public async Task ClearWays() {
+        using var connection = createConnection();
+        using var deleteWayCommand = connection.CreateCommand();
+        deleteWayCommand.CommandText = @"DELETE FROM way;";
+        await deleteWayCommand.ExecuteNonQueryAsync();
+    }
+
+    public async Task CompressDatabase() {
+        using var connection = createConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText = @"VACUUM;";
+        await command.ExecuteNonQueryAsync();
+    }
 }

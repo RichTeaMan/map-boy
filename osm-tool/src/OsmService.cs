@@ -126,6 +126,14 @@ public class OsmService
 
         Console.WriteLine("Deduplicating 3D and 2D buildings...");
         await Deduplicate3dBuildings();
+
+        Console.WriteLine("Compressing database...");
+        var preCompressedSize = await sqliteStore.FetchSizeBytes();
+        await sqliteStore.ClearNodes();
+        await sqliteStore.ClearWays();
+        await sqliteStore.CompressDatabase();
+        var compressedSize = await sqliteStore.FetchSizeBytes();
+        Console.WriteLine($"Database compressed from {preCompressedSize}b to {compressedSize}b.");
     }
 
     private string[] FetchAreaNames(Dictionary<string, string> tags)

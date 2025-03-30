@@ -19,9 +19,28 @@ jobs:
         run: |
             cd godot-build
             ./build.sh
-      - name: Archive Godot binaries
+
+      - name: Archive Godot linuxbsd binaries
         uses: actions/upload-artifact@v4
         with:
-          name: dist-without-markdown
+          name: godot-linuxbsd
           path: |
-            godot-build/bin/*
+            godot-build/bin/linuxbsd/*
+      - name: Archive Godot windows binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: godot-windows
+          path: |
+            godot-build/bin/windows/*
+      - name: Archive Godot web release no threads binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: godot-web-release-no-threads
+          path: |
+            godot-build/bin/web-release-no-threads/*
+      - name: Archive Godot web debug no threads binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: godot-web-debug-no-threads
+          path: |
+            godot-build/bin/web-debug-no-threads/*

@@ -1,0 +1,57 @@
+name: Build
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - '*'
+    paths:
+      - 'osm-api/**'
+      - 'osm-tool/**'
+      - 'osm-tool-test/**'
+      - '.github/workflows/build.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Download artifact
+        id: download-artifact
+        uses: dawidd6/action-download-artifact@v9
+        with:
+          workflow: download-osm.yml
+          workflow_conclusion: success
+          event: push
+          name: pbf-files
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Restore
+        run: |
+            dotnet restore
+
+      - name: Build
+        run: |
+            dotnet build
+
+      - name: Test
+        run: |
+            dotnet test
+
+      - name: Build database
+        run: |
+            cd osm-tool
+            dotnet run ../greater-london.osm.pbf
+
+      - name: Archive DB files
+        uses: actions/upload-artifact@v4
+        with:
+          name: db-files
+          path: |
+            *.db

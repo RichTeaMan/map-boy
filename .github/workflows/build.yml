@@ -85,6 +85,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Push API image
+        if: github.ref == 'refs/heads/main'
         run: |
             docker tag osm-api ghcr.io/richteaman/map-boy-api:latest
             docker push ghcr.io/richteaman/map-boy-api:latest

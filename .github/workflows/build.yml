@@ -5,6 +5,7 @@ on:
     branches:
       - '*'
     paths:
+      - 'app/*'
       - 'osm-api/**'
       - 'osm-tool/**'
       - 'osm-tool-test/**'

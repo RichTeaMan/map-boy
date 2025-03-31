@@ -1,3 +1,4 @@
 {
-    "api_url": "https://mapboy.richteaman.com/api"
+    "api_url": "/api",
+    "calculate_web_host": true
 }

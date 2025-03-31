@@ -2,7 +2,7 @@
 
 set -e
 
-git clone --branch "4.4-stable" --depth 1 https://github.com/godotengine/godot.git
+git clone --branch "4.4.1-stable" --depth 1 https://github.com/godotengine/godot.git
 
 cd godot
 

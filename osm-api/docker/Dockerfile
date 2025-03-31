@@ -6,8 +6,10 @@ LABEL org.opencontainers.image.licenses=GPL
 
 EXPOSE 8443
 ENV DB_FILE_PATH=osm.db
+ENV ALLOW_HTTP=false
 
 COPY bin/published/ .
 COPY static-files/ static-files
+COPY osm.db .
 RUN dotnet dev-certs https
 ENTRYPOINT [ "dotnet", "osm-api.dll", "--urls=https://*:8443;http://*:8080"]

@@ -29,6 +29,17 @@ Godot builds will be saved to `godot-build/bin/`.
 
 ## Running the server
 
+Only one of the following are required.
+
+### With Docker
+
+```bash
+docker pull ghcr.io/richteaman/map-boy-api:latest
+docker run -it --rm --name osm-api -p 5291:8080 -e ALLOW_HTTP=true ghcr.io/richteaman/map-boy-api:latest
+```
+
+### From source
+
 ```bash
 ./download-data.sh greater-london
 (cd osm-tool && dotnet run ../greater-london.osm.pbf)

@@ -59,7 +59,9 @@ public class Program
             RequestPath = "",
         });
 
-        app.UseHttpsRedirection();
+        if (Environment.GetEnvironmentVariable("ALLOW_HTTP")?.ToLower() != "true") {
+            app.UseHttpsRedirection();
+        }
         app.Use(async (context, next) =>
         {
 

@@ -66,6 +66,7 @@ jobs:
 
       - name: Create API Docker image
         run: |
+            cp osm-tool/*.db osm-api/osm.db
             # remove godot prefix added by artifacts
             cd godot-build/bin
             for file in "godot-"*;

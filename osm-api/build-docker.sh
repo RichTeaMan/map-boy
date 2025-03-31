@@ -9,7 +9,7 @@ chmod +x ../godot-build/bin/linuxbsd/godot.linuxbsd.editor.double.x86_64
 
 rm static-files -rf
 mkdir static-files
-cp ../app/web/* static-files/. -r
+cp ../app/export/web/* static-files/. -r
 rm static-files/.gdignore -f
 
 echo "Building API..."

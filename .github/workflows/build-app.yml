@@ -1,0 +1,54 @@
+name: Build
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - '*'
+    paths:
+      - 'app/*'
+      - '.github/workflows/build-app.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download Godot files
+        uses: dawidd6/action-download-artifact@v9
+        with:
+          workflow: build-godot.yml
+          workflow_conclusion: success
+          branch: main
+          event: push
+          path: godot-build/bin/
+
+      - name: Prepare Godot binary
+        run: |
+            # remove godot prefix added by artifacts
+            cd godot-build/bin
+            for file in "godot-"*;
+            do
+              mv "$file" "${file#godot-}"
+            done
+
+      - name: Export desktop apps
+        run: |
+            cd app
+            ./export-desktop.sh
+
+      - name: Archive Linux app
+        uses: actions/upload-artifact@v4
+        with:
+          name: godot-linux-export
+          path: |
+            app/export/mapboy.linux.x86_64
+
+      - name: Archive Windows app
+        uses: actions/upload-artifact@v4
+        with:
+          name: godot-windows-export
+          path: |
+            app/export/mapboy.windows.x86_64

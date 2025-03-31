@@ -17,9 +17,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
-      - name: Download artifact
-        id: download-artifact
+
+      - name: Download PBF files
         uses: dawidd6/action-download-artifact@v9
         with:
           workflow: download-osm.yml
@@ -54,4 +53,36 @@ jobs:
         with:
           name: db-files
           path: |
-            *.db
+            osm-tool/*.db
+
+      - name: Download Godot files
+        uses: dawidd6/action-download-artifact@v9
+        with:
+          workflow: build-godot.yml
+          workflow_conclusion: success
+          branch: main
+          event: push
+          path: godot-build/bin/
+
+      - name: Create API Docker image
+        run: |
+            # remove godot prefix added by artifacts
+            cd godot-build/bin
+            for file in "godot-"*;
+            do
+              mv "$file" "${file#godot-}"
+            done
+            cd ../../osm-api
+            ./build-docker.sh
+
+      - name: Log into docker registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push API image
+        run: |
+            docker tag osm-api ghcr.io/richteaman/map-boy-api:latest
+            docker push ghcr.io/richteaman/map-boy-api:latest

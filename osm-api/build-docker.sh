@@ -1,7 +1,11 @@
 #!/bin/bash
 
+set -e
+
 echo "Building web export..."
-../godot-build/bin/godot.linuxbsd.editor.double.x86_64 --headless --export-release Web ../app/project.godot
+# build from github is zipped and loses eXecutable
+chmod +x ../godot-build/bin/linuxbsd/godot.linuxbsd.editor.double.x86_64
+../godot-build/bin/linuxbsd/godot.linuxbsd.editor.double.x86_64 --headless --export-release Web ../app/project.godot
 
 rm static-files -rf
 mkdir static-files

@@ -1,0 +1,29 @@
+name: Download OSM files
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - '*'
+    paths:
+      - 'download-data.sh'
+      - '.github/workflows/download-osm.yml'
+
+jobs:
+  download:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download
+        run: |
+            ./download-data.sh greater-london
+            ./download-data.sh england
+
+      - name: Archive PBF files
+        uses: actions/upload-artifact@v4
+        with:
+          name: pbf-files
+          path: |
+            *.pbf

@@ -52,19 +52,21 @@ public class Program
             app.MapOpenApi();
         }
 
-        app.UseStaticFiles(new StaticFileOptions
+        app.UseFileServer(new FileServerOptions
         {
             FileProvider = new PhysicalFileProvider(Path.Combine(builder.Environment.ContentRootPath, "static-files")),
-            ServeUnknownFileTypes = true,
             RequestPath = "",
+            DefaultFilesOptions = { DefaultFileNames = ["index.html"] },
+            EnableDefaultFiles = true,
+            StaticFileOptions = { ServeUnknownFileTypes = true }
         });
 
-        if (Environment.GetEnvironmentVariable("ALLOW_HTTP")?.ToLower() != "true") {
+        if (Environment.GetEnvironmentVariable("ALLOW_HTTP")?.ToLower() != "true")
+        {
             app.UseHttpsRedirection();
         }
         app.Use(async (context, next) =>
         {
-
             var startTime = DateTimeOffset.Now;
             await next(context);
             var endTime = DateTimeOffset.Now;

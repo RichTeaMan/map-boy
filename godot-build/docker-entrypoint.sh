@@ -11,18 +11,22 @@ source /project/emsdk/emsdk_env.sh
 
 mkdir -p bin
 
-mkdir ../bin/linuxbsd
+mkdir -p ../bin/linuxbsd
 scons platform=linuxbsd float=64 precision=double production=yes
+scons platform=linuxbsd float=64 precision=double production=yes target=template_release arch=x86_64
+scons platform=linuxbsd float=64 precision=double production=yes target=template_debug arch=x86_64
 mv bin/* ../bin/linuxbsd/.
 
-mkdir ../bin/windows
+mkdir -p ../bin/windows
 scons platform=windows float=64 precision=double production=yes
+scons platform=windows float=64 precision=double production=yes target=template_release arch=x86_64
+scons platform=windows float=64 precision=double production=yes target=template_debug arch=x86_64
 mv bin/* ../bin/windows/.
 
-mkdir ../bin/web-release-no-threads
+mkdir -p ../bin/web-release-no-threads
 scons platform=web target=template_release precision=double threads=no
 mv bin/* ../bin/web-release-no-threads/.
 
-mkdir ../bin/web-debug-no-threads
+mkdir -p ../bin/web-debug-no-threads
 scons platform=web target=template_debug precision=double threads=no
 mv bin/* ../bin/web-debug-no-threads/.

@@ -50,6 +50,7 @@ unique_name_in_owner = true
 [node name="street_camera" type="Camera3D" parent="cameras"]
 unique_name_in_owner = true
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.8, 0)
+far = 400.0
 
 [node name="satellite_camera" type="Camera3D" parent="cameras"]
 unique_name_in_owner = true

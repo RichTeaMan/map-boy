@@ -18,6 +18,7 @@ var purge_amount = 500
 var load_window = 0.02
 
 func _ready():
+    get_tree().root.use_occlusion_culling = true
     var start = Global.lat_lon_to_vector(51.4995145764631, -0.126637687351658)
     %cameras.position.x = start.x
     %satellite_camera.position.y = 10.0
@@ -122,6 +123,10 @@ func _process(delta: float):
             i += 1
         var next_cam_id = (i + 1) % cameras.size()
         cameras[next_cam_id].current = true
+    if Input.is_action_just_pressed("visible"):
+        $map.visible = !$map.visible
+    if Input.is_action_just_pressed("cull"):
+        cull()
     
     refresh_tile_queue()
 
@@ -187,6 +192,89 @@ func purge_map_area_nodes():
         if tile_marker_node.position.x < lat1 || tile_marker_node.position.x > lat2 || tile_marker_node.position.z < lon1 || tile_marker_node.position.z > lon2:
             tile_marker_node.queue_free()
             loaded_tiles.erase(tile_marker_node.tile_id)
+
+func cull():
+
+    var camera_transform = %street_camera.global_transform
+    for node in $map.get_children():
+        if not node is Node3D:
+            continue
+
+        var node_transform = node.global_transform
+
+        var camera_to_node = camera_transform.origin.direction_to(node_transform.origin).normalized()
+        var camera_forward = -camera_transform.basis.z.normalized() # Camera's forward vector
+
+        var dot_product = camera_forward.dot(camera_to_node)
+
+        # If the dot product is negative, the node is behind the camera
+        if dot_product < 0:
+            if node is MeshInstance3D:
+                node.visible = false
+            elif node is Sprite3D:
+                node.visible = false
+            elif node is OmniLight3D:
+                node.visible = false
+            elif node is SpotLight3D:
+                node.visible = false
+            elif node is Decal:
+                node.visible = false
+            # Add other node types that you want to hide.
+            else:
+                # If node is a Node3D, try hiding its children.
+                if node is Node3D:
+                    hide_children(node)
+        else:
+            if node is MeshInstance3D:
+                node.visible = true
+            elif node is Sprite3D:
+                node.visible = true
+            elif node is Area3D:
+                node.monitoring = true
+            elif node is OmniLight3D:
+                node.visible = true
+            elif node is SpotLight3D:
+                node.visible = true
+            elif node is Decal:
+                node.visible = true
+            else:
+                show_children(node)
+
+func hide_children(parent):
+    for child in parent.get_children():
+        if child is MeshInstance3D:
+            child.visible = false
+        elif child is Sprite3D:
+            child.visible = false
+        elif child is Area3D:
+            child.monitoring = false
+        elif child is OmniLight3D:
+            child.visible = false
+        elif child is SpotLight3D:
+            child.visible = false
+        elif child is Decal:
+            child.visible = false
+        elif child is Node3D:
+            hide_children(child)
+        # Add other node types you want to hide here.
+
+func show_children(parent):
+     for child in parent.get_children():
+        if child is MeshInstance3D:
+            child.visible = true
+        elif child is Sprite3D:
+            child.visible = true
+        elif child is Area3D:
+            child.monitoring = true
+        elif child is OmniLight3D:
+            child.visible = true
+        elif child is SpotLight3D:
+            child.visible = true
+        elif child is Decal:
+            child.visible = true
+        elif child is Node3D:
+            show_children(child)
+        # Add other node types you want to show here.
 
 func _on_areas_http_request_request_completed(_result, _response_code, _headers, body):
     #print("area response...")

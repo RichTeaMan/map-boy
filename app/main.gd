@@ -20,8 +20,11 @@ var purge_amount = 500
 var load_window = 0.02
 
 func _ready():
-    controllers.append(StreetKeyboardController.new())
-    controllers.append(SatelliteKeyboardController.new())
+    controllers.append_array([
+        StreetKeyboardController.new(),
+        SatelliteKeyboardController.new(),
+        SatelliteMouseController.new(),
+    ])
 
     var start = Global.lat_lon_to_vector(51.4995145764631, -0.126637687351658)
     %cameras.position.x = start.x
@@ -70,9 +73,9 @@ func _process(delta: float):
     var is_satellite_mode: bool = %satellite_camera.current
     for controller in controllers:
         if is_street_mode && controller.is_street_controller():
-            controller.control(%street_camera, %cameras, delta)
+            controller.control(%street_camera, %cameras, delta, get_viewport())
         if is_satellite_mode && controller.is_satellite_controller():
-            controller.control(%satellite_camera, %cameras, delta)
+            controller.control(%satellite_camera, %cameras, delta, get_viewport())
     
     if Input.is_action_just_pressed("camera_change"):
         var cameras = []

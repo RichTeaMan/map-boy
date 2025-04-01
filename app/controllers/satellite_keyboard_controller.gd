@@ -1,7 +1,7 @@
 class_name SatelliteKeyboardController
 extends Controller
 
-func control(camera: Camera3D, camera_collection_node: Node3D, delta: float) -> void:
+func control(camera: Camera3D, camera_collection_node: Node3D, delta: float, viewport: Viewport) -> void:
     var player = camera.get_global_transform().basis
     var forward = player.y
     var backward = -player.y

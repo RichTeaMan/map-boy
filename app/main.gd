@@ -24,6 +24,7 @@ func _ready():
         StreetKeyboardController.new(),
         SatelliteKeyboardController.new(),
         SatelliteMouseController.new(),
+        StreetMouseController.new(),
     ])
 
     var start = Global.lat_lon_to_vector(51.4995145764631, -0.126637687351658)
@@ -93,6 +94,15 @@ func _process(delta: float):
         cameras[next_cam_id].current = true
     
     refresh_tile_queue()
+
+func _input(event: InputEvent) -> void:
+    var is_street_mode: bool = %street_camera.current
+    var is_satellite_mode: bool = %satellite_camera.current
+    for controller in controllers:
+        if is_street_mode && controller.is_street_controller():
+            controller.handle_input(event)
+        if is_satellite_mode && controller.is_satellite_controller():
+            controller.handle_input(event)
 
 func refresh_tile_queue():
     if tiles_pending:

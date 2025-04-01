@@ -2,6 +2,8 @@ extends Node3D
 
 const layer_factor = 0.1
 
+var controllers: Array[Controller] = []
+
 var loaded_tiles = {}
 var loaded_large_area_ids = {}
 
@@ -18,6 +20,9 @@ var purge_amount = 500
 var load_window = 0.02
 
 func _ready():
+    controllers.append(StreetKeyboardController.new())
+    controllers.append(SatelliteKeyboardController.new())
+
     var start = Global.lat_lon_to_vector(51.4995145764631, -0.126637687351658)
     %cameras.position.x = start.x
     %satellite_camera.position.y = 10.0
@@ -61,53 +66,14 @@ func _process(delta: float):
     purge_map_area_nodes()
     
     # camera movement
-    if %street_camera.current:
-        var player = %street_camera.get_global_transform().basis
-        var forward = -player.z
-        var backward = player.z
-        var left = -player.x
-        var right = player.x
-        
-        var move_factor := 25.0 * delta
-        var rotate_factor := 1.0 * delta
-        if Input.is_action_pressed("rotate_left"):
-            %cameras.rotate_y(rotate_factor)
-        if Input.is_action_pressed("rotate_right"):
-            %cameras.rotate_y(-rotate_factor)
-        if Input.is_action_pressed("left"):
-            %cameras.position += left * move_factor
-        if Input.is_action_pressed("right"):
-            %cameras.position += right * move_factor
-        if Input.is_action_pressed("up"):
-            %cameras.position += forward * move_factor
-        if Input.is_action_pressed("down"):
-            %cameras.position += backward * move_factor
-    else:
-        var player = %satellite_camera.get_global_transform().basis
-        var forward = player.y
-        var backward = -player.y
-        var left = -player.x
-        var right = player.x
-        var zoom_factor := 30.0 * delta
-        var move_factor := 50.0 * delta
-        var rotate_factor := 2.5 * delta
-        if Input.is_action_pressed("rotate_left"):
-            %cameras.rotate_y(-rotate_factor)
-        if Input.is_action_pressed("rotate_right"):
-            %cameras.rotate_y(rotate_factor)
-        if Input.is_action_pressed("ui_up"):
-            %satellite_camera.position.y -= zoom_factor
-        if Input.is_action_pressed("ui_down"):
-            %satellite_camera.position.y += zoom_factor
-        if Input.is_action_pressed("left"):
-            %cameras.position += left * move_factor
-        if Input.is_action_pressed("right"):
-            %cameras.position += right * move_factor
-        if Input.is_action_pressed("up"):
-            %cameras.position += forward * move_factor
-        if Input.is_action_pressed("down"):
-            %cameras.position += backward * move_factor
-        
+    var is_street_mode: bool = %street_camera.current
+    var is_satellite_mode: bool = %satellite_camera.current
+    for controller in controllers:
+        if is_street_mode && controller.is_street_controller():
+            controller.control(%street_camera, %cameras, delta)
+        if is_satellite_mode && controller.is_satellite_controller():
+            controller.control(%satellite_camera, %cameras, delta)
+    
     if Input.is_action_just_pressed("camera_change"):
         var cameras = []
         for cam in %cameras.get_children():

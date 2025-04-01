@@ -2,7 +2,8 @@ extends Node3D
 
 const layer_factor = 0.1
 
-var controllers: Array[Controller] = []
+var control_schemes: Array[ControlScheme] = []
+var current_control_scheme: ControlScheme
 
 var loaded_tiles = {}
 var loaded_large_area_ids = {}
@@ -20,12 +21,25 @@ var purge_amount = 500
 var load_window = 0.02
 
 func _ready():
-    controllers.append_array([
+    var street_scheme := ControlScheme.new()
+    street_scheme.camera = %street_camera
+    street_scheme.controllers = [
         StreetKeyboardController.new(),
+        StreetMouseController.new(),
+    ]
+    street_scheme.locks_mouse = true
+    var satellite_scheme := ControlScheme.new()
+    satellite_scheme.camera = %satellite_camera
+    satellite_scheme.controllers = [
         SatelliteKeyboardController.new(),
         SatelliteMouseController.new(),
-        StreetMouseController.new(),
+    ]
+    satellite_scheme.locks_mouse = false
+    control_schemes.append_array([
+        street_scheme,
+        satellite_scheme
     ])
+    switch_to_control_scheme(street_scheme)
 
     var start = Global.lat_lon_to_vector(51.4995145764631, -0.126637687351658)
     %cameras.position.x = start.x
@@ -70,39 +84,32 @@ func _process(delta: float):
     purge_map_area_nodes()
     
     # camera movement
-    var is_street_mode: bool = %street_camera.current
-    var is_satellite_mode: bool = %satellite_camera.current
-    for controller in controllers:
-        if is_street_mode && controller.is_street_controller():
-            controller.control(%street_camera, %cameras, delta, get_viewport())
-        if is_satellite_mode && controller.is_satellite_controller():
-            controller.control(%satellite_camera, %cameras, delta, get_viewport())
+    for controller in current_control_scheme.controllers:
+        controller.control(current_control_scheme.camera, %cameras, delta, get_viewport())
     
     if Input.is_action_just_pressed("camera_change"):
-        var cameras = []
-        for cam in %cameras.get_children():
-            if cam is Camera3D:
-                cameras.append(cam)
-        var i = 0
-        var current_cam_id = 0
-        for cam in cameras:
-            if cam.current:
-                cam.current = false
-                break
-            i += 1
-        var next_cam_id = (i + 1) % cameras.size()
-        cameras[next_cam_id].current = true
+        var current_scheme_id = control_schemes.find(current_control_scheme)
+        var next_scheme_id = (current_scheme_id + 1) % control_schemes.size()
+        var next_scheme = control_schemes[next_scheme_id]
+        switch_to_control_scheme(next_scheme)
     
     refresh_tile_queue()
+
+func switch_to_control_scheme(new_control_scheme: ControlScheme) -> void:
+    for control_scheme in control_schemes:
+        control_scheme.camera.current = false
+    new_control_scheme.camera.current = true
+    if new_control_scheme.locks_mouse:
+        Global.capture_mouse()
+    else:
+        Global.release_mouse()
+    current_control_scheme = new_control_scheme
 
 func _input(event: InputEvent) -> void:
     var is_street_mode: bool = %street_camera.current
     var is_satellite_mode: bool = %satellite_camera.current
-    for controller in controllers:
-        if is_street_mode && controller.is_street_controller():
-            controller.handle_input(event)
-        if is_satellite_mode && controller.is_satellite_controller():
-            controller.handle_input(event)
+    for controller in current_control_scheme.controllers:
+        controller.handle_input(event)
 
 func refresh_tile_queue():
     if tiles_pending:

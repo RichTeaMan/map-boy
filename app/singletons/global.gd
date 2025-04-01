@@ -2,6 +2,8 @@ extends Node
 
 var coord_factor = 40_075_000 / 360
 
+var mouse_captured := false
+
 signal teleport(lat: float, lon, float)
 
 # Called when the node enters the scene tree for the first time.
@@ -33,3 +35,14 @@ func vector_to_lat_lon(v: Vector2) -> Vector2:
 func lat_lon_to_vector3(lat: float, height: float, lon: float) -> Vector3:
     var v2 = lat_lon_to_vector(lat, lon)
     return Vector3(v2.x, height, v2.y)
+
+func capture_mouse() -> void:
+    Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+    mouse_captured = true
+
+func release_mouse() -> void:
+    Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+    mouse_captured = false
+
+func is_mouse_captured():
+    return mouse_captured

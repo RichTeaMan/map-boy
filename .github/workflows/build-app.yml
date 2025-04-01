@@ -33,6 +33,7 @@ jobs:
             do
               mv "$file" "${file#godot-}"
             done
+            ls -lh
 
       - name: Export desktop apps
         run: |

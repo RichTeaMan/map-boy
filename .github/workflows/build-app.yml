@@ -5,11 +5,11 @@ on:
     branches:
       - '*'
     paths:
-      - 'app/*'
+      - 'app/**'
       - '.github/workflows/build-app.yml'
 
 jobs:
-  build:
+  build-app:
     runs-on: ubuntu-latest
 
     steps:

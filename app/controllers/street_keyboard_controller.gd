@@ -22,6 +22,8 @@ func control(camera: Camera3D, camera_collection_node: Node3D, delta: float, vie
         camera_collection_node.position += forward * move_factor
     if Input.is_action_pressed("down"):
         camera_collection_node.position += backward * move_factor
+    # hack to keep player on the ground plane
+    camera_collection_node.position.y = 0.0
 
 func is_street_controller() -> bool:
     return true

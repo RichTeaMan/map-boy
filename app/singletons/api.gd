@@ -14,7 +14,7 @@ static func getBase() -> String:
                 var config = JSON.parse_string(file.get_as_text())
                 base = config.api_url
                 print("Using API at %s" % base)
-                if config.wcalculate_web_host == true:
+                if config.calculate_web_host == true:
                     var host: String = JavaScriptBridge.eval("window.location.protocol +'//' + window.location.host")
                     base = host + base
                 return base

@@ -71,7 +71,7 @@ public class Program
             await next(context);
             var endTime = DateTimeOffset.Now;
             var duration = endTime - startTime;
-            Console.WriteLine($"[{DateTimeOffset.Now}] {context.Request.Path} - {context.Response.StatusCode} {duration.TotalMilliseconds:0.##}ms");
+            Console.WriteLine($"[{DateTimeOffset.Now}] {context.Request.Method} {context.Request.Path}{context.Request.QueryString} - {context.Response.StatusCode} {duration.TotalMilliseconds:0.##}ms");
         });
 
         var apiPath = app.MapGroup("/api");

@@ -24,6 +24,7 @@ static func getBase() -> String:
 static func get_tile_id_range(lat1: float, lon1: float, lat2: float, lon2: float) -> String:
     return "%s/tileIdRange/%s/%s/%s/%s" % [getBase(), lat1, lon1, lat2, lon2]
 
+
 static func get_areas_by_tile_id(tile_id: int) -> String:
     return "%s/areas?tileId=%s" % [ getBase(), tile_id ]
 

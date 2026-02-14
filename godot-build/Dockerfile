@@ -1,5 +1,7 @@
 FROM ubuntu
 
+ENV DOTNET_CLI_HOME=/tmp/dotnet
+
 RUN apt-get update && \
   apt-get install -y \
     build-essential \
@@ -17,7 +19,8 @@ RUN apt-get update && \
     libxrandr-dev \
     libwayland-dev \
     mingw-w64 \
-    git
+    git \
+    dotnet-sdk-8.0
 
 RUN update-alternatives --set x86_64-w64-mingw32-gcc /usr/bin/x86_64-w64-mingw32-gcc-posix && \
   update-alternatives --set x86_64-w64-mingw32-g++ /usr/bin/x86_64-w64-mingw32-g++-posix

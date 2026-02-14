@@ -7,13 +7,20 @@ if [[ $PLATFORM == "" ]]; then
   PLATFORM="all"
 fi
 
-git clone --branch "4.4.1-stable" --depth 1 https://github.com/godotengine/godot.git
+git clone --branch "4.6-stable" --depth 1 https://github.com/godotengine/godot.git
 
 cd godot
+
+python3 misc/scripts/install_d3d12_sdk_windows.py
 
 /project/emsdk/emsdk activate latest
 source /project/emsdk/emsdk_env.sh
 
+DATE=$(date --iso-8601)
+
+BIN_PATH="bin/$DATE"
+
+#rm -f $BIN_PATH
 mkdir -p bin
 
 
@@ -21,42 +28,84 @@ mkdir -p bin
 if [[ $PLATFORM == "linuxbsd-editor" || $PLATFORM == "all" ]]; then
     mkdir -p ../bin/linuxbsd-editor
     scons platform=linuxbsd float=64 precision=double production=yes
-    mv bin/* ../bin/linuxbsd-editor/.
+    cp -r bin/* ../bin/linuxbsd-editor/.
 fi
 if [[ $PLATFORM == "linuxbsd-template-release" || $PLATFORM == "all" ]]; then
     mkdir -p ../bin/linuxbsd-template-release
     scons platform=linuxbsd float=64 precision=double production=yes target=template_release arch=x86_64
-    mv bin/* ../bin/linuxbsd-template-release
+    cp -r bin/* ../bin/linuxbsd-template-release
 fi
 if [[ $PLATFORM == "linuxbsd-template-debug" || $PLATFORM == "all" ]]; then
     mkdir -p ../bin/linuxbsd-template-debug
     scons platform=linuxbsd float=64 precision=double production=yes target=template_debug arch=x86_64
-    mv bin/* ../bin/linuxbsd-template-debug
+    cp -r bin/* ../bin/linuxbsd-template-debug
 fi
 
 if [[ $PLATFORM == "windows-editor" || $PLATFORM == "all" ]]; then
     mkdir -p ../bin/windows-editor
     scons platform=windows float=64 precision=double production=yes
-    mv bin/* ../bin/windows-editor
+    cp -r bin/* ../bin/windows-editor
 fi
 if [[ $PLATFORM == "windows-template-release" || $PLATFORM == "all" ]]; then
     mkdir -p ../bin/windows-template-release
     scons platform=windows float=64 precision=double production=yes target=template_release arch=x86_64
-    mv bin/* ../bin/windows-template-release
+    cp -r bin/* ../bin/windows-template-release
 fi
 if [[ $PLATFORM == "windows-template-debug" || $PLATFORM == "all" ]]; then
     mkdir -p ../bin/windows-template-debug
     scons platform=windows float=64 precision=double production=yes target=template_debug arch=x86_64
-    mv bin/* ../bin/windows-template-debug
+    cp -r bin/* ../bin/windows-template-debug
 fi
 
 if [[ $PLATFORM == "web-release-no-threads" || $PLATFORM == "all" ]]; then
     mkdir -p ../bin/web-release-no-threads
     scons platform=web target=template_release precision=double threads=no
-    mv bin/* ../bin/web-release-no-threads/.
+    cp -r bin/* ../bin/web-release-no-threads/.
 fi
 if [[ $PLATFORM == "web-debug-no-threads" || $PLATFORM == "all" ]]; then
     mkdir -p ../bin/web-debug-no-threads
     scons platform=web target=template_debug precision=double threads=no
-    mv bin/* ../bin/web-debug-no-threads/.
+    cp -r bin/* ../bin/web-debug-no-threads/.
+fi
+
+if [[ $PLATFORM == "net-linuxbsd-editor" || $PLATFORM == "all" ]]; then
+    mkdir -p ../bin/net-linuxbsd-editor
+    scons platform=linuxbsd module_mono_enabled=yes float=64 precision=double production=yes
+    ./bin/godot.linuxbsd.editor.double.x86_64.mono --headless --generate-mono-glue modules/mono/glue
+    ./modules/mono/build_scripts/build_assemblies.py --precision=double --godot-output-dir=./bin
+    cp -r bin/* ../bin/net-linuxbsd-editor/.
+fi
+if [[ $PLATFORM == "net-linuxbsd-template-release" || $PLATFORM == "all" ]]; then
+    mkdir -p ../bin/net-linuxbsd-template-release
+    scons platform=linuxbsd module_mono_enabled=yes float=64 precision=double production=yes target=template_release arch=x86_64
+    ./bin/godot.linuxbsd.editor.double.x86_64.mono --headless --generate-mono-glue modules/mono/glue
+    ./modules/mono/build_scripts/build_assemblies.py --precision=double --godot-output-dir=./bin
+    cp -r bin/* ../bin/net-linuxbsd-template-release
+fi
+if [[ $PLATFORM == "net-linuxbsd-template-debug" || $PLATFORM == "all" ]]; then
+    mkdir -p ../bin/net-linuxbsd-template-debug
+    scons platform=linuxbsd module_mono_enabled=yes float=64 precision=double production=yes arch=x86_64
+    scons platform=linuxbsd module_mono_enabled=yes float=64 precision=double production=yes target=template_debug arch=x86_64
+    ls -lh
+    echo "bin"
+    ls ./bin -lh
+    ./bin/godot.linuxbsd.editor.double.x86_64.mono --headless --generate-mono-glue modules/mono/glue
+    ./modules/mono/build_scripts/build_assemblies.py --precision=double --godot-output-dir=./bin
+    cp -r bin/* ../bin/net-linuxbsd-template-debug
+fi
+
+if [[ $PLATFORM == "net-windows-editor" || $PLATFORM == "all" ]]; then
+    mkdir -p ../bin/net-windows-editor
+    scons platform=windows module_mono_enabled=yes float=64 precision=double production=yes
+    cp -r bin/* ../bin/net-windows-editor
+fi
+if [[ $PLATFORM == "net-windows-template-release" || $PLATFORM == "all" ]]; then
+    mkdir -p ../bin/net-windows-template-release
+    scons platform=windows module_mono_enabled=yes float=64 precision=double production=yes target=template_release arch=x86_64
+    cp -r bin/* ../bin/net-windows-template-release
+fi
+if [[ $PLATFORM == "net-windows-template-debug" || $PLATFORM == "all" ]]; then
+    mkdir -p ../bin/net-windows-template-debug
+    scons platform=windows module_mono_enabled=yes float=64 precision=double production=yes target=template_debug arch=x86_64
+    cp -r bin/* ../bin/net-windows-template-debug
 fi

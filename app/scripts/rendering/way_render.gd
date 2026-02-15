@@ -47,6 +47,8 @@ static func fetch_material(colour: String):
                 material.albedo_color = Color.GRAY
             "light-grey":
                 material.albedo_color = Color.LIGHT_GRAY
+            "lightgrey":
+                material.albedo_color = Color.LIGHT_GRAY
             "yellow":
                 material.albedo_color = Color.YELLOW
             "purple":
@@ -61,10 +63,13 @@ static func fetch_material(colour: String):
                 material.albedo_color = Color.LIGHT_PINK
             "dark-grey":
                 material.albedo_color = Color.SLATE_GRAY
+            "darkgrey":
+                material.albedo_color = Color.SLATE_GRAY
             "pale-yellow":
                 material.albedo_color = Color.HONEYDEW
             _:
                 material.albedo_color = Color.html(cleaned_colour)
+                printerr("Warning, unknown colour: %s." % cleaned_colour)
         material_map[colour] = material
     return material
 
@@ -128,7 +133,7 @@ static func create_2d_mesh_from_polygon(polygon_points: PackedVector2Array, inne
         var indices = Geometry2D.triangulate_polygon(polygon_points)
 
         if indices.is_empty():
-            printerr("Error: Triangulation failed over %s points." % polygon_points.size())
+            printerr("Error: Triangulation 2D failed over %s points." % polygon_points.size())
             #for p in polygon_points:
             #    print("%s, %s" % [p.x, p.y])
             continue
@@ -154,7 +159,7 @@ static func create_3d_mesh_from_polygon(polygon_points: PackedVector2Array, heig
     var indices = Geometry2D.triangulate_polygon(polygon_points)
 
     if indices.is_empty():
-        printerr("Error: Triangulation failed over %s points." % polygon_points.size())
+        printerr("Error: Triangulation 3D failed over %s points." % polygon_points.size())
         return null
 
     var arrays = []

@@ -16,7 +16,7 @@ var last_pos_lat = null
 var last_pos_long = null
 var last_purge_index = 0
 ## Maximum number of entities to check for purging in a single tick
-var purge_amount = 500
+var purge_amount = 5
 
 var load_window = 0.02
 
@@ -138,7 +138,7 @@ func refresh_tile_queue():
     last_pos_long = current_lon
 
 func purge_map_area_nodes():
-    
+
     # search for tiles 0.1 degrees around camera postion, which is very roughly similar to 1.7km
     var deg_range = load_window * Global.coord_factor * 2.0
     var current_lat = %cameras.position.x

@@ -395,14 +395,18 @@ public class OsmService
         // is not represented. If it stays, texture fighting happens in the app. THe polygon probably needs
         // bisecting, but that seems like a lot of work.
 
-
         var runBatch = async (IEnumerable<Area> area3dsBatch) =>
         {
             if (area3dsBatch.Count() == 0)
             {
                 return 0;
             }
-            var tileIds = area3dsBatch.SelectMany(a => new[] { a.TileId }.Concat(tileService.CalcAllTileIds(a.OuterCoordinates))).Distinct().OrderBy(t => t).ToArray();
+            var tileIds = area3dsBatch
+                .SelectMany(a => new[] { a.TileId }
+                .Concat(tileService.CalcAllTileIds(a.OuterCoordinates)))
+                .Distinct()
+                .OrderBy(t => t)
+                .ToArray();
 
             // tile id arg only referes to average tile for a building, maybe inaccuate?
             var flatAreas = await sqliteStore.FetchAreas(null, tileIds)
@@ -432,7 +436,7 @@ public class OsmService
             if (area3dsBatch.Count > 1000)
             {
                 totalDeduplications += await runBatch(area3dsBatch);
-                area3dsBatch.Clear();
+                area3dsBatch = new List<Area>();
             }
         }
         totalDeduplications += await runBatch(area3dsBatch);
@@ -441,7 +445,12 @@ public class OsmService
 
     private async Task SaveAreaBatch(IEnumerable<Way> ways)
     {
-        foreach (var wayBatch in ways.Chunk(1000))
+        // manual hacks
+        var exclusions = new HashSet<long> {
+            123557148 // big ben
+        };
+
+        foreach (var wayBatch in ways.Where(w => !exclusions.Contains(w.Id)).Chunk(1000))
         {
             var databaseAreas = new List<Area>();
             var largeTilesDict = new Dictionary<string, long[]>();

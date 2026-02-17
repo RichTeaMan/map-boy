@@ -26,7 +26,9 @@ mkdir -p bin
 
 if [[ $PLATFORM == "linuxbsd-editor" || $PLATFORM == "all" ]]; then
     mkdir -p ../bin/linuxbsd-editor
-    scons platform=linuxbsd float=64 precision=double production=yes
+    scons platform=linuxbsd float=64 precision=double production=yes tools=yes module_mono_enabled=yes mono_glue=no
+    ./bin/godot.linuxbsd.editor.double.x86_64.mono  --headless --precision=double --generate-mono-glue modules/mono/glue
+    ./modules/mono/build_scripts/build_assemblies.py --precision=double --godot-output-dir=./bin
     cp -r bin/* ../bin/linuxbsd-editor/.
     chown "$CHOWN_ARG" ../bin -R
 fi

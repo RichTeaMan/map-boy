@@ -20,6 +20,8 @@ var purge_amount = 5
 
 var load_window = 0.02
 
+var api
+
 func _ready():
     var street_scheme := ControlScheme.new()
     street_scheme.camera = %street_camera
@@ -55,6 +57,9 @@ func _ready():
     
     Global.teleport.connect(_on_teleport)
 
+    var api_class = load("res://singletons/Api.cs")
+    api = api_class.new()
+
 func _process(delta: float):
     
     # load map
@@ -63,7 +68,7 @@ func _process(delta: float):
         if loaded_tiles.has(tile_info.tile_id):
             continue
         #print("Requesting area for tile %s." % tile_id)
-        $areaHttpRequestPool.request_now(Api.get_areas_by_tile_id(tile_info.tile_id))
+        $areaHttpRequestPool.request_now(api.get_areas_by_tile_id(tile_info.tile_id))
         var tile_marker = TileMarkerNode.new()
         tile_marker.tile_id = tile_info.tile_id
         tile_marker.position = tile_info.tile_position
@@ -76,7 +81,7 @@ func _process(delta: float):
         if loaded_large_area_ids.has(large_area_id):
             continue
         #print("Requesting area for tile %s." % tile_id)
-        $largeAreaHttpRequestPool.request_now(Api.get_areas_by_ids(large_area_id))
+        $largeAreaHttpRequestPool.request_now(api.get_areas_by_ids(large_area_id))
         var tile_marker = TileMarkerNode.new()
         loaded_large_area_ids[large_area_id] = true
     
@@ -131,7 +136,7 @@ func refresh_tile_queue():
     var lon1 = current_lon - deg_range
     var lat2 = current_lat + deg_range
     var lon2 = current_lon + deg_range
-    $tilesIdRangeHttpRequest.request(Api.get_tile_id_range(lat1, lon1, lat2, lon2))
+    $tilesIdRangeHttpRequest.request(api.get_tile_id_range(lat1, lon1, lat2, lon2))
     tiles_pending = true
     
     last_pos_lat = current_lat

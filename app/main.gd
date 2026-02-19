@@ -84,8 +84,9 @@ func _process(delta: float):
         if loaded_large_area_ids.has(large_area_id):
             continue
         #print("Requesting area for tile %s." % tile_id)
-        $largeAreaHttpRequestPool.request_now(api.get_areas_by_ids(large_area_id))
-        var tile_marker = TileMarkerNode.new()
+        #$largeAreaHttpRequestPool.request_now(api.get_areas_by_ids(large_area_id))
+        #var tile_marker = TileMarkerNode.new()
+        api.QueueGetAreaById(large_area_id)
         loaded_large_area_ids[large_area_id] = true
     
     while true:
@@ -93,6 +94,13 @@ func _process(delta: float):
         if response == null:
             break
         _on_areas_completed(response)
+    
+    while true:
+        var response = api.DequeueGetAreaByIdAsVariant()
+        if response == null:
+            break
+        create_areas(response)
+    
     
     # purge map
     purge_map_area_nodes()

@@ -20,6 +20,8 @@ public partial class Api : GodotObject
 
     private Queue<AreaContainer> areaContainerQueue = new Queue<AreaContainer>();
 
+    private Queue<Area[]> areasQueue = new Queue<Area[]>();
+
     private Http.HttpClient httpClient = new Http.HttpClient();
 
     string getBase()
@@ -110,6 +112,30 @@ public partial class Api : GodotObject
     public string get_areas_by_ids(long area_id)
     {
         return $"{getBase()}/areasByIds?ids={area_id}";
+    }
+
+    public void QueueGetAreaById(long tileId)
+    {
+        var cb = (Area[] areas) =>
+        {
+            areasQueue.Enqueue(areas);
+        };
+        queueRequest(get_areas_by_ids(tileId), cb);
+    }
+
+    public Area[] DequeueGetAreaById()
+    {
+        if (areasQueue.Count > 0)
+        {
+            return areasQueue.Dequeue();
+        }
+        return null;
+    }
+
+    public Variant DequeueGetAreaByIdAsVariant()
+    {
+        var areas = DequeueGetAreaById();
+        return GodotUtils.ToGodotVariant(areas);
     }
 
     public string search(string term)

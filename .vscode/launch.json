@@ -10,7 +10,7 @@
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
-            "program": "${workspaceFolder}/osm-tool/bin/Debug/net9.0/osm-tool.dll",
+            "program": "${workspaceFolder}/osm-tool/bin/Debug/net10.0/osm-tool.dll",
             //"args": ["${workspaceFolder}/greater-london.osm.pbf"],
             "args": ["${workspaceFolder}/osm-tool/datasets/westminster.osm"],
             "cwd": "${workspaceFolder}",

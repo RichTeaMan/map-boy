@@ -1,92 +1,10 @@
+//using System.Collections.Concurrent;
 using System.Collections.Concurrent;
 using System.Data;
+using MapBoy.Models;
 using OsmTool.Models;
 
 namespace OsmTool;
-
-
-public record Coord
-{
-    public double Lat { get; set; }
-    public double Lon { get; set; }
-
-    public Coord() { }
-
-    public Coord(double lat, double lon) : this()
-    {
-        Lat = lat;
-        Lon = lon;
-    }
-
-    public double DistanceTo(Coord other)
-    {
-        return Math.Sqrt(Math.Pow(Lat - other.Lat, 2) + Math.Pow(Lon - other.Lon, 2));
-    }
-
-    public double DistanceSquaredTo(Coord other)
-    {
-        return Math.Pow(Lat - other.Lat, 2) + Math.Pow(Lon - other.Lon, 2);
-    }
-
-    public bool LocationEquals(Coord other)
-    {
-        return Lat == other.Lat && Lon == other.Lon;
-    }
-
-    public static Coord[] FromNodes(IEnumerable<OsmNode> nodes)
-    {
-        return nodes.Select(n => new Coord { Lat = n.Lat, Lon = n.Lon }).ToArray();
-    }
-}
-
-public class Way
-{
-    public long Id { get; set; }
-    public bool? Visible { get; set; }
-    public int? Version { get; set; }
-    public long? ChangeSet { get; set; }
-    public DateTimeOffset? Timestamp { get; set; }
-    public string? User { get; set; }
-    public long? Uid { get; set; }
-    public bool ClosedLoop { get; set; }
-    public long? AreaParentId { get; set; }
-    public string Tags { get; set; } = "";
-
-    public Dictionary<string, string> TagsToDict()
-    {
-        return DictUtils.StringToDict(Tags);
-    }
-}
-
-public class Area
-{
-    public long Id { get; set; }
-
-    public required string Source { get; set; }
-    public bool Visible { get; set; }
-    public int? Version { get; set; }
-    public long? ChangeSet { get; set; }
-    public DateTimeOffset? Timestamp { get; set; }
-    public string? User { get; set; }
-    public long? Uid { get; set; }
-    public required Coord[][] OuterCoordinates { get; set; }
-    public required Coord[][] InnerCoordinates { get; set; }
-    public required string[] Names { get; set; }
-    public required string SuggestedColour { get; set; }
-    public long TileId { get; set; }
-    public int Layer { get; set; }
-    public double Height { get; set; }
-
-    public double MinHeight { get; set; }
-    public double RoofHeight { get; set; }
-    public required string RoofType { get; set; }
-    public required string RoofColour { get; set; }
-    public required string RoofOrientation { get; set; }
-    public bool IsLarge { get; set; }
-
-    public bool Is3d { get; set; }
-
-}
 
 public class OsmService
 {
@@ -240,7 +158,7 @@ public class OsmService
                 {
                     if (way.ClosedLoop)
                     {
-                        loopCoords.Add(Coord.FromNodes(wayNodes[way.Id]));
+                        loopCoords.Add(FromNodes(wayNodes[way.Id]));
                     }
                     else
                     {
@@ -253,7 +171,7 @@ public class OsmService
                     // osm polygons are closed, however we do not always have the entire polygon.
                     // some fiddly code to close it ourselves
                     var orderedCoords = new List<Coord>();
-                    orderedCoords.AddRange(Coord.FromNodes(wayNodes[unusedWays.First().Id]));
+                    orderedCoords.AddRange(FromNodes(wayNodes[unusedWays.First().Id]));
                     unusedWays.Remove(unusedWays.First());
 
                     while (unusedWays.Count > 0)
@@ -265,7 +183,7 @@ public class OsmService
                         bool reversed = false;
                         foreach (var way in unusedWays)
                         {
-                            var wayCoords = Coord.FromNodes(wayNodes[way.Id]);
+                            var wayCoords = FromNodes(wayNodes[way.Id]);
                             var dist = wayCoords.First().DistanceSquaredTo(orderedCoords.Last());
                             if (dist < shortest)
                             {
@@ -337,7 +255,7 @@ public class OsmService
                         continue;
                     }
                 }
-                var innerCoords = innerWays.Select(w => Coord.FromNodes(wayNodes[w.Id])).ToArray();
+                var innerCoords = innerWays.Select(w => FromNodes(wayNodes[w.Id])).ToArray();
                 var largeTileResult = tileService.CalcLargeTileRange(coords);
                 var heightResult = heightService.CalcBuildingHeight(relation.Tags);
                 var tileId = tileService.CalcTileId(coords);
@@ -467,14 +385,14 @@ public class OsmService
             foreach (var way in wayBatch)
             {
                 var orderedCoords = new List<Coord>();
-                orderedCoords.AddRange(Coord.FromNodes(wayNodes[way.Id]));
+                orderedCoords.AddRange(FromNodes(wayNodes[way.Id]));
 
                 if (orderedCoords.Count == 0)
                 {
                     Console.WriteLine($"Failed to find any coords for way {way.Id}");
                     continue;
                 }
-                var wayTags = way.TagsToDict();
+                var wayTags = TagsToDict(way);
                 var names = FetchAreaNames(wayTags);
                 var visible = way.Visible ?? true;
 
@@ -563,7 +481,7 @@ public class OsmService
             foreach (var way in wayBatch)
             {
                 var orderedCoords = new List<Coord>();
-                orderedCoords.AddRange(Coord.FromNodes(wayNodes[way.Id]));
+                orderedCoords.AddRange(FromNodes(wayNodes[way.Id]));
 
                 if (orderedCoords.Count == 0)
                 {
@@ -571,7 +489,7 @@ public class OsmService
                     continue;
                 }
                 double width = 0.0;
-                var wayTags = way.TagsToDict();
+                var wayTags = TagsToDict(way);
                 if (wayTags.TryGetValue("highway", out string? highwayValue))
                 {
                     switch (highwayValue)
@@ -662,4 +580,17 @@ public class OsmService
             await sqliteStore.SaveAreaBatch(databaseAreas);
         }
     }
+
+
+
+    private Coord[] FromNodes(IEnumerable<OsmNode> nodes)
+    {
+        return nodes.Select(n => new Coord { Lat = n.Lat, Lon = n.Lon }).ToArray();
+    }
+
+    private Dictionary<string, string> TagsToDict(Way way)
+    {
+        return DictUtils.StringToDict(way.Tags);
+    }
+
 }

@@ -1,4 +1,6 @@
-﻿namespace OsmTool.Test;
+﻿using MapBoy.Models;
+
+namespace OsmTool.Test;
 
 [TestClass]
 public sealed class HighwayBuilderServiceTest

@@ -1,5 +1,7 @@
 
+using MapBoy.Models;
 using OsmTool;
+using OsmTool.Models;
 
 public static class CoordUtils
 {
@@ -58,5 +60,10 @@ public static class CoordUtils
             }
         }
         return false;
+    }
+
+    public static Coord[] FromNodes(IEnumerable<OsmNode> nodes)
+    {
+        return nodes.Select(n => new Coord { Lat = n.Lat, Lon = n.Lon }).ToArray();
     }
 }

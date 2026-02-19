@@ -1,4 +1,5 @@
 using System.Data;
+using MapBoy.Models;
 using Microsoft.Data.Sqlite;
 using OsmTool.Models;
 

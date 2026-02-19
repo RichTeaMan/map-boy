@@ -68,7 +68,10 @@ func _process(delta: float):
         if loaded_tiles.has(tile_info.tile_id):
             continue
         #print("Requesting area for tile %s." % tile_id)
-        $areaHttpRequestPool.request_now(api.get_areas_by_tile_id(tile_info.tile_id))
+        #$areaHttpRequestPool.request_now(api.get_areas_by_tile_id(tile_info.tile_id))
+        api.QueueGetAreaByTileId(tile_info.tile_id)
+
+
         var tile_marker = TileMarkerNode.new()
         tile_marker.tile_id = tile_info.tile_id
         tile_marker.position = tile_info.tile_position
@@ -84,6 +87,12 @@ func _process(delta: float):
         $largeAreaHttpRequestPool.request_now(api.get_areas_by_ids(large_area_id))
         var tile_marker = TileMarkerNode.new()
         loaded_large_area_ids[large_area_id] = true
+    
+    while true:
+        var response = api.DequeueGetAreaByTileIdAsVariant()
+        if response == null:
+            break
+        _on_areas_completed(response)
     
     # purge map
     purge_map_area_nodes()
@@ -184,6 +193,19 @@ func _on_areas_http_request_request_completed(_result, _response_code, _headers,
     var area_response = JSON.parse_string(body.get_string_from_utf8())
     var areas = area_response.areas
     var large_area_ids = area_response.largeAreaIds
+    for large_area_id: int in large_area_ids:
+        if !loaded_large_area_ids.has(large_area_id):
+            large_area_queue.append(large_area_id)
+    create_areas(areas)
+
+    #print("area response processed")
+    area_pending = false
+
+
+func _on_areas_completed(area_response):
+    #print("area response...")
+    var areas = area_response.Areas
+    var large_area_ids = area_response.LargeAreaIds
     for large_area_id: int in large_area_ids:
         if !loaded_large_area_ids.has(large_area_id):
             large_area_queue.append(large_area_id)

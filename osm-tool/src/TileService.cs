@@ -3,13 +3,6 @@ using MapBoy.Models;
 
 namespace OsmTool;
 
-public class Tile
-{
-    public long Id { get; set; }
-    public double Lat { get; set; }
-    public double Lon { get; set; }
-}
-
 public class LargeTileRangeResult
 {
     public required IEnumerable<Tile> Tiles { get; init; }

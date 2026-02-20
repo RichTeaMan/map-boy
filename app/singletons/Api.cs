@@ -20,9 +20,18 @@ public partial class Api : GodotObject
 
     private Queue<AreaContainer> areaContainerQueue = new Queue<AreaContainer>();
 
+    private Queue<TileContainer> tileContainerQueue = new Queue<TileContainer>();
+
     private Queue<Area[]> areasQueue = new Queue<Area[]>();
 
     private Http.HttpClient httpClient = new Http.HttpClient();
+
+    private T DequeueOrNull<T>(Queue<T> queue) where T : class {
+        if (queue.Count > 0) {
+            return queue.Dequeue();
+        }
+        return null;
+    }
 
     string getBase()
     {
@@ -62,6 +71,26 @@ public partial class Api : GodotObject
         return $"{getBase()}/tileIdRange/{r(lat1)}/{r(lon1)}/{r(lat2)}/{r(lon2)}";
     }
 
+    public void QueueGetTileIdRange(double lat1, double lon1, double lat2, double lon2)
+    {
+        var cb = (TileContainer tileContainer) =>
+        {
+            tileContainerQueue.Enqueue(tileContainer);
+        };
+        queueRequest(get_tile_id_range(lat1, lon1, lat2, lon2), cb);
+    }
+
+    public TileContainer DequeueGetTileIdRange()
+    {
+        return DequeueOrNull(tileContainerQueue);
+    }
+
+    public Variant DequeueGetTileIdRangeAsVariant()
+    {
+        var tileContainer = DequeueGetTileIdRange();
+        return GodotUtils.ToGodotVariant(tileContainer);
+    }
+
     public string get_areas_by_tile_id(long tile_id)
     {
         return $"{getBase()}/areas?tileId={tile_id}";
@@ -95,11 +124,7 @@ public partial class Api : GodotObject
 
     public AreaContainer DequeueGetAreaByTileId()
     {
-        if (areaContainerQueue.Count > 0)
-        {
-            return areaContainerQueue.Dequeue();
-        }
-        return null;
+        return DequeueOrNull(areaContainerQueue);
     }
 
     public Variant DequeueGetAreaByTileIdAsVariant()
@@ -125,11 +150,7 @@ public partial class Api : GodotObject
 
     public Area[] DequeueGetAreaById()
     {
-        if (areasQueue.Count > 0)
-        {
-            return areasQueue.Dequeue();
-        }
-        return null;
+        return DequeueOrNull(areasQueue);
     }
 
     public Variant DequeueGetAreaByIdAsVariant()

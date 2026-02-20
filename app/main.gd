@@ -101,6 +101,12 @@ func _process(delta: float):
             break
         create_areas(response)
     
+    while true:
+        var response = api.DequeueGetTileIdRangeAsVariant()
+        if response == null:
+            break
+        _on_tiles_http_request_request_completed(response)
+    
     
     # purge map
     purge_map_area_nodes()
@@ -153,7 +159,8 @@ func refresh_tile_queue():
     var lon1 = current_lon - deg_range
     var lat2 = current_lat + deg_range
     var lon2 = current_lon + deg_range
-    $tilesIdRangeHttpRequest.request(api.get_tile_id_range(lat1, lon1, lat2, lon2))
+    #$tilesIdRangeHttpRequest.request(api.get_tile_id_range(lat1, lon1, lat2, lon2))
+    api.QueueGetTileIdRange(lat1, lon1, lat2, lon2)
     tiles_pending = true
     
     last_pos_lat = current_lat
@@ -234,11 +241,10 @@ func create_areas(areas):
         if area_node != null:
             $map.add_child(area_node)
 
-func _on_tiles_http_request_request_completed(_result, _response_code, _headers, body):
+func _on_tiles_http_request_request_completed(tileResponse):
     #print("tile response...")
     area_queue.clear()
     $areaHttpRequestPool.clear_queue()
-    var tileResponse = JSON.parse_string(body.get_string_from_utf8())
     for tile in tileResponse.tiles:
         var tile_id: int = tile.id
         if loaded_tiles.has(tile_id):

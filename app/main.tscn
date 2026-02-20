@@ -2,7 +2,6 @@
 
 [ext_resource type="Script" uid="uid://b6efl8tcjqitj" path="res://main.gd" id="1_4rdyb"]
 [ext_resource type="PackedScene" uid="uid://ca587oe3rcyf5" path="res://marker.tscn" id="2_8qnr4"]
-[ext_resource type="Script" uid="uid://c2ewgv377dder" path="res://custom_nodes/http_request_pool.gd" id="2_xvfvq"]
 
 [sub_resource type="PhysicalSkyMaterial" id="PhysicalSkyMaterial_3s87r"]
 
@@ -18,22 +17,6 @@ ambient_light_energy = 7.65
 
 [node name="Main" type="Node3D" unique_id=717058223]
 script = ExtResource("1_4rdyb")
-
-[node name="areaHttpRequestPool" type="Node" parent="." unique_id=1338200754]
-unique_name_in_owner = true
-script = ExtResource("2_xvfvq")
-
-[node name="largeAreaHttpRequestPool" type="Node" parent="." unique_id=1139170822]
-unique_name_in_owner = true
-script = ExtResource("2_xvfvq")
-
-[node name="areasHttpRequest" type="HTTPRequest" parent="." unique_id=47590194]
-download_chunk_size = 6291456
-use_threads = true
-
-[node name="tilesIdRangeHttpRequest" type="HTTPRequest" parent="." unique_id=312331521]
-download_chunk_size = 2097152
-use_threads = true
 
 [node name="map" type="Node3D" parent="." unique_id=945060883]
 

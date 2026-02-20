@@ -50,10 +50,10 @@ func _ready():
     
     #$Camera3D.look_at(Vector3(avg_lat, 0.0, avg_lon), Vector3(0,1,0))
     
-    $areaHttpRequestPool.request_completed.connect(_on_areas_http_request_request_completed)
-    $largeAreaHttpRequestPool.request_completed.connect(_on_large_areas_http_request_request_completed)
-    $areasHttpRequest.request_completed.connect(_on_areas_http_request_request_completed)
-    $tilesIdRangeHttpRequest.request_completed.connect(_on_tiles_http_request_request_completed)
+    #$areaHttpRequestPool.request_completed.connect(_on_areas_http_request_request_completed)
+    #$largeAreaHttpRequestPool.request_completed.connect(_on_large_areas_http_request_request_completed)
+    #$areasHttpRequest.request_completed.connect(_on_areas_http_request_request_completed)
+    #$tilesIdRangeHttpRequest.request_completed.connect(_on_tiles_http_request_request_completed)
     
     Global.teleport.connect(_on_teleport)
 
@@ -63,7 +63,7 @@ func _ready():
 func _process(delta: float):
     
     # load map
-    while area_queue.size() > 0 && $areaHttpRequestPool.is_ready():
+    while area_queue.size() > 0: # && $areaHttpRequestPool.is_ready():
         var tile_info = area_queue.pop_front()
         if loaded_tiles.has(tile_info.tile_id):
             continue
@@ -79,7 +79,7 @@ func _process(delta: float):
         $tile_markers.add_child(tile_marker)
         loaded_tiles[tile_info.tile_id] = true
     
-    while large_area_queue.size() > 0 && $largeAreaHttpRequestPool.is_ready():
+    while large_area_queue.size() > 0: # && $largeAreaHttpRequestPool.is_ready():
         var large_area_id = large_area_queue.pop_front()
         if loaded_large_area_ids.has(large_area_id):
             continue
@@ -244,7 +244,7 @@ func create_areas(areas):
 func _on_tiles_http_request_request_completed(tileResponse):
     #print("tile response...")
     area_queue.clear()
-    $areaHttpRequestPool.clear_queue()
+    #$areaHttpRequestPool.clear_queue()
     for tile in tileResponse.tiles:
         var tile_id: int = tile.id
         if loaded_tiles.has(tile_id):

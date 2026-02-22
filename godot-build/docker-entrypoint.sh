@@ -9,7 +9,10 @@ if [[ $PLATFORM == "" ]]; then
   PLATFORM="all"
 fi
 
-git clone --branch "4.6-stable" --depth 1 https://github.com/godotengine/godot.git
+export GODOT_TAG="4.6-stable"
+export GODOT_VERSION_STATUS="mapboy"
+
+git clone --branch "$GODOT_TAG" --depth 1 https://github.com/godotengine/godot.git
 
 cd godot
 
@@ -26,10 +29,12 @@ mkdir -p bin
 
 if [[ $PLATFORM == "linuxbsd-editor" || $PLATFORM == "all" ]]; then
     mkdir -p ../bin/linuxbsd-editor
+    mkdir -p ../bin/linuxbsd-editor/nuget
     scons platform=linuxbsd float=64 precision=double production=yes tools=yes module_mono_enabled=yes mono_glue=no
     ./bin/godot.linuxbsd.editor.double.x86_64.mono  --headless --precision=double --generate-mono-glue modules/mono/glue
-    ./modules/mono/build_scripts/build_assemblies.py --precision=double --godot-output-dir=./bin
+    ./modules/mono/build_scripts/build_assemblies.py --precision=double --godot-output-dir=./bin --push-nupkgs-local ./nuget
     cp -r bin/* ../bin/linuxbsd-editor/.
+    cp -r nuget/* ../bin/linuxbsd-editor/nuget/.
     chown "$CHOWN_ARG" ../bin -R
 fi
 if [[ $PLATFORM == "linuxbsd-template-release" || $PLATFORM == "all" ]]; then

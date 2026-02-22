@@ -2,7 +2,7 @@ using Godot;
 
 public abstract class Controller
 {
-    public abstract void Control(Camera3D camera, Node3D camera_collection_node, float delta, Viewport viewport);
+    public abstract void Control(Camera3D camera, Node3D cameraCollectionNode, double delta, Viewport viewport);
 
     public virtual void HandleInput(InputEvent inputEvent) { }
 

@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://dnot2k6d5atay"]
 
-[ext_resource type="Script" uid="uid://b6efl8tcjqitj" path="res://main.gd" id="1_4rdyb"]
+[ext_resource type="Script" uid="uid://0kg0vtbh6eqy" path="res://Main.cs" id="1_0xm2m"]
 [ext_resource type="PackedScene" uid="uid://ca587oe3rcyf5" path="res://marker.tscn" id="2_8qnr4"]
 
 [sub_resource type="PhysicalSkyMaterial" id="PhysicalSkyMaterial_3s87r"]
@@ -16,7 +16,7 @@ ambient_light_color = Color(0.907942, 0.907942, 0.907942, 1)
 ambient_light_energy = 7.65
 
 [node name="Main" type="Node3D" unique_id=717058223]
-script = ExtResource("1_4rdyb")
+script = ExtResource("1_0xm2m")
 
 [node name="map" type="Node3D" parent="." unique_id=945060883]
 

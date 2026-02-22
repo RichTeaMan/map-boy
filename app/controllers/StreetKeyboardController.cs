@@ -1,33 +1,25 @@
 using Godot;
 
-public class SatelliteKeyboardController : Controller
+public class StreetKeyboardController : Controller
 {
 
     public override void Control(Camera3D camera, Node3D cameraCollectionNode, double delta, Viewport viewport)
     {
         var player = camera.GlobalTransform.Basis;
-        var forward = player.Y;
-        var backward = -player.Y;
+        var forward = -player.Z;
+        var backward = player.Z;
         var left = -player.X;
         var right = player.X;
-        double zoom_factor = 30.0f * delta;
-        double move_factor = 50.0f * delta;
-        double rotate_factor = 2.5 * delta;
+
+        var move_factor = 25.0 * delta;
+        var rotate_factor = 1.0 * delta;
         if (Input.IsActionPressed("rotate_left"))
-        {
-            cameraCollectionNode.RotateY(-rotate_factor);
-        }
-        if (Input.IsActionPressed("rotate_right"))
         {
             cameraCollectionNode.RotateY(rotate_factor);
         }
-        if (Input.IsActionPressed("ui_up"))
+        if (Input.IsActionPressed("rotate_right"))
         {
-            camera.Position = Vector3WithYMod(camera.Position, -zoom_factor);
-        }
-        if (Input.IsActionPressed("ui_down"))
-        {
-            camera.Position = Vector3WithYMod(camera.Position, zoom_factor);
+            cameraCollectionNode.RotateY(-rotate_factor);
         }
         if (Input.IsActionPressed("left"))
         {
@@ -45,7 +37,10 @@ public class SatelliteKeyboardController : Controller
         {
             cameraCollectionNode.Position += backward * move_factor;
         }
+        // hack to keep player on the ground plane
+        cameraCollectionNode.Position = new Vector3(cameraCollectionNode.Position.X, 0.0, cameraCollectionNode.Position.Z);
     }
 
-    public override bool IsSatelliteController { get { return true; } }
+    public override bool IsStreetController => true;
+
 }

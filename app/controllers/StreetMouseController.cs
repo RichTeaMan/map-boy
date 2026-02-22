@@ -3,23 +3,22 @@ using Godot;
 public class StreetMouseController : Controller
 {
 
-    private bool look_direction_changed = false;
-    private Vector2 look_direction = Vector2.Zero;
+    private bool lookDirectionChanged = false;
+    private Vector2 lookDirection = Vector2.Zero;
 
-    private double camera_sens = 1.0f;
-    private double sens_mod = 1.0f;
+    private double cameraSensitivity = 1.0f;
+    private double cameraSensitivityModifier = 1.0f;
 
-    public override void Control(Camera3D camera, Node3D camera_collection_node, float delta, Viewport viewport)
+    public override void Control(Camera3D camera, Node3D cameraCollectionNode, double delta, Viewport viewport)
     {
-        if (look_direction_changed)
+        if (lookDirectionChanged)
         {
-            double t = camera.Rotation.Z;
             //camera.Rotation.Y -= look_direction.X * camera_sens * sens_mod;
-            camera.Rotation = Vector3WithYMod(camera.Rotation, look_direction.X * camera_sens * sens_mod);
+            camera.Rotation = Vector3WithYMod(camera.Rotation, lookDirection.X * cameraSensitivity * cameraSensitivityModifier);
             //camera.Rotation.X = Mathf.Clamp(camera.Rotation.X - look_direction.Y * camera_sens * sens_mod, -1.5, 1.5);
-            camera.Rotation = Vector3WithX(camera.Rotation, Mathf.Clamp(camera.Rotation.X - look_direction.Y * camera_sens * sens_mod, -1.5f, 1.5f));
+            camera.Rotation = Vector3WithX(camera.Rotation, Mathf.Clamp(camera.Rotation.X - lookDirection.Y * cameraSensitivity * cameraSensitivityModifier, -1.5f, 1.5f));
             
-            look_direction_changed = false;
+            lookDirectionChanged = false;
         }
     }
 
@@ -28,8 +27,8 @@ public class StreetMouseController : Controller
         base.HandleInput(inputEvent);
         if (inputEvent is InputEventMouseMotion inputEventMouseMotion)
         {
-            look_direction = inputEventMouseMotion.Relative * 0.001f;
-            look_direction_changed = true;
+            lookDirection = inputEventMouseMotion.Relative * -0.001f;
+            lookDirectionChanged = true;
 
             //if mouse_captured: _rotate_camera()
         }

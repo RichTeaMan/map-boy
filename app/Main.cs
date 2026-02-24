@@ -40,6 +40,8 @@ public partial class Main : Node3D
 
     private Api api = new Api();
 
+    private WayRender wayRender = new WayRender();
+
     public override void _Ready()
     {
         global = GetNode<Global>("/root/Global");
@@ -64,7 +66,7 @@ public partial class Main : Node3D
         ];
         switch_to_control_scheme(street_scheme);
 
-        var start = global.lat_lon_to_vector(51.4995145764631, -0.126637687351658);
+        var start = Global.lat_lon_to_vector(51.4995145764631, -0.126637687351658);
         GetNode<Node3D>("%cameras").Position = new Vector3(start.X, 0.0, start.Y);
         var statCamPos = satellite_scheme.Camera.Position;
         satellite_scheme.Camera.Position = new Vector3(statCamPos.X, 10.0, statCamPos.Z);
@@ -233,8 +235,6 @@ public partial class Main : Node3D
 
     private void purge_map_area_nodes()
     {
-        // TODO remove when WayFinder returns a better object
-        return;
         // search for tiles 0.1 degrees around camera postion, which is very roughly similar to 1.7km
         var deg_range = load_window * global.coord_factor * 2.0;
         var current_lat = Cameras.Position.X;
@@ -321,17 +321,6 @@ public partial class Main : Node3D
         var areas = JSON.parse_string(body.get_string_from_utf8())
         create_areas(areas)
     */
-    private static GDScript wayRenderScript = null;
-
-    private static Node3D WayRenderShim(Area area)
-    {
-        if (wayRenderScript == null)
-        {
-            wayRenderScript = GD.Load<GDScript>("res://scripts/rendering/way_render.gd");
-        }
-        Node3D node = wayRenderScript.Call("create_area_node", GodotUtils.ToGodotVariant(area)).As<Node3D>();
-        return node;
-    }
 
     private void create_areas(Area[] areas)
     {
@@ -341,8 +330,7 @@ public partial class Main : Node3D
         }
         foreach (var area in areas)
         {
-            //MapAreaNode area_node = WayRender.create_area_node(area);
-            Node3D area_node = WayRenderShim(area);
+            MapAreaNode area_node = wayRender.create_area_node(area);
             if (area_node != null)
             {
                 Map.AddChild(area_node);
@@ -371,7 +359,7 @@ public partial class Main : Node3D
 
     private void _on_teleport(double lat, double lon)
     {
-        var v2 = global.lat_lon_to_vector(lat, lon);
+        var v2 = Global.lat_lon_to_vector(lat, lon);
         var position = Cameras.Position;
         Cameras.Position = new Vector3(v2.X, position.Y, v2.Y);
     }

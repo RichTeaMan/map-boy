@@ -66,7 +66,7 @@ public partial class Main : Node3D
         ];
         switch_to_control_scheme(street_scheme);
 
-        var start = Global.lat_lon_to_vector(51.4995145764631, -0.126637687351658);
+        var start = Global.LatLonToVector(51.4995145764631, -0.126637687351658);
         GetNode<Node3D>("%cameras").Position = new Vector3(start.X, 0.0, start.Y);
         var statCamPos = satellite_scheme.Camera.Position;
         satellite_scheme.Camera.Position = new Vector3(statCamPos.X, 10.0, statCamPos.Z);
@@ -254,11 +254,11 @@ public partial class Main : Node3D
         while (i < purge_limit)
         {
             var map_area_node = map_area_nodes[i];
-            if (map_area_node.is_large)
+            if (map_area_node.IsLarge)
             {
-                if (map_area_node.max_vert.X < lat1 || map_area_node.min_vert.X > lat2 || map_area_node.max_vert.Y < lon1 || map_area_node.min_vert.Y > lon2)
+                if (map_area_node.MaxVert.X < lat1 || map_area_node.MinVert.X > lat2 || map_area_node.MaxVert.Y < lon1 || map_area_node.MinVert.Y > lon2)
                 {
-                    loaded_large_area_ids.Remove(map_area_node.area_id);
+                    loaded_large_area_ids.Remove(map_area_node.AreaId);
                     map_area_node.QueueFree();
                 }
             }
@@ -330,7 +330,7 @@ public partial class Main : Node3D
         }
         foreach (var area in areas)
         {
-            MapAreaNode area_node = wayRender.create_area_node(area);
+            MapAreaNode area_node = wayRender.CreateAreaNode(area);
             if (area_node != null)
             {
                 Map.AddChild(area_node);
@@ -359,7 +359,7 @@ public partial class Main : Node3D
 
     private void _on_teleport(double lat, double lon)
     {
-        var v2 = Global.lat_lon_to_vector(lat, lon);
+        var v2 = Global.LatLonToVector(lat, lon);
         var position = Cameras.Position;
         Cameras.Position = new Vector3(v2.X, position.Y, v2.Y);
     }

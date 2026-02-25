@@ -31,7 +31,7 @@ public partial class Global : Node
         Connect(SignalName.Teleport, callable);
     }
 
-    public static Vector2 lat_lon_to_vector(double lat, double lon)
+    public static Vector2 LatLonToVector(double lat, double lon)
     {
         var lon_length = 40_075_000.0 * Mathf.Cos(lat / 180.0 * Mathf.Pi) / 360.0;
         var r = new Vector2(lat * 111320, lon * lon_length);
@@ -49,7 +49,7 @@ public partial class Global : Node
 
     public Vector3 lat_lon_to_vector3(double lat, double height, double lon)
     {
-        var v2 = lat_lon_to_vector(lat, lon);
+        var v2 = LatLonToVector(lat, lon);
         return new Vector3(v2.X, height, v2.Y);
     }
 

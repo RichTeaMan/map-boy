@@ -9,7 +9,7 @@ public class SatelliteMouseController : Controller
     public override void Control(Camera3D camera, Node3D cameraCollectionNode, double delta, Viewport viewport)
     {
 
-        var zoom_factor = 30.0 * delta;
+        var zoom_factor = 300.0 * delta;
         if (Input.IsActionJustReleased("mouse_wheel_up"))
         {
             camera.Position = Vector3WithYMod(camera.Position, -zoom_factor);

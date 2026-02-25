@@ -116,25 +116,37 @@ public class SqliteStore : ILocationSearch
         {
             using var connection = createConnection();
             using var transaction = connection.BeginTransaction();
+            using var insertNodeCommand = connection.CreateCommand();
+            insertNodeCommand.Transaction = transaction;
+            insertNodeCommand.CommandText = @"
+            INSERT INTO node (id, visible, version, change_set, timestamp, user, uid, lat, lon, tile_id, layer)
+                VALUES($id, $visible, $version, $change_set, $timestamp, $user, $uid, $lat, $lon, $tile_id, $layer);
+            ";
+
+            var idParam = insertNodeCommand.Parameters.Add("$id", SqliteType.Integer);
+            var visibleParam = insertNodeCommand.Parameters.Add("$visible", SqliteType.Integer);
+            var versionParam = insertNodeCommand.Parameters.Add("$version", SqliteType.Integer);
+            var changeSetParam = insertNodeCommand.Parameters.Add("$change_set", SqliteType.Integer);
+            var timestampParam = insertNodeCommand.Parameters.Add("$timestamp", SqliteType.Text);
+            var userParam = insertNodeCommand.Parameters.Add("$user", SqliteType.Text);
+            var uidParam = insertNodeCommand.Parameters.Add("$uid", SqliteType.Integer);
+            var latParam = insertNodeCommand.Parameters.Add("$lat", SqliteType.Real);
+            var lonParam = insertNodeCommand.Parameters.Add("$lon", SqliteType.Real);
+            var tileIdParam = insertNodeCommand.Parameters.Add("$tile_id", SqliteType.Integer);
+            var layerParam = insertNodeCommand.Parameters.Add("$layer", SqliteType.Integer);
             foreach (var node in nodeBatch)
             {
-                using var insertNodeCommand = connection.CreateCommand();
-                insertNodeCommand.Transaction = transaction;
-                insertNodeCommand.CommandText = @"
-                INSERT INTO node (id, visible, version, change_set, timestamp, user, uid, lat, lon, tile_id, layer)
-                    VALUES($id, $visible, $version, $change_set, $timestamp, $user, $uid, $lat, $lon, $tile_id, $layer);
-                ";
-                insertNodeCommand.Parameters.AddWithValue("$id", node.Id);
-                insertNodeCommand.Parameters.AddWithValue("$visible", node.Visible as object ?? DBNull.Value);
-                insertNodeCommand.Parameters.AddWithValue("$version", node.Version as object ?? DBNull.Value);
-                insertNodeCommand.Parameters.AddWithValue("$change_set", node.ChangeSet as object ?? DBNull.Value);
-                insertNodeCommand.Parameters.AddWithValue("$timestamp", node.Timestamp?.ToString("yyyy-MM-ddTHH:mm:ssZ") as object ?? DBNull.Value);
-                insertNodeCommand.Parameters.AddWithValue("$user", node.User as object ?? DBNull.Value);
-                insertNodeCommand.Parameters.AddWithValue("$uid", node.Uid as object ?? DBNull.Value);
-                insertNodeCommand.Parameters.AddWithValue("$lat", node.Lat);
-                insertNodeCommand.Parameters.AddWithValue("$lon", node.Lon);
-                insertNodeCommand.Parameters.AddWithValue("$tile_id", tileService.CalcTileId(node.Lat, node.Lon));
-                insertNodeCommand.Parameters.AddWithValue("$layer", node.Tags.TryGetValue("layer", out string? value) ? value : 0);
+                idParam.Value = node.Id;
+                visibleParam.Value = node.Visible as object ?? DBNull.Value;
+                versionParam.Value = node.Version as object ?? DBNull.Value;
+                changeSetParam.Value = node.ChangeSet as object ?? DBNull.Value;
+                timestampParam.Value = node.Timestamp?.ToString("yyyy-MM-ddTHH:mm:ssZ") as object ?? DBNull.Value;
+                userParam.Value = node.User as object ?? DBNull.Value;
+                uidParam.Value = node.Uid as object ?? DBNull.Value;
+                latParam.Value = node.Lat;
+                lonParam.Value = node.Lon;
+                tileIdParam.Value = tileService.CalcTileId(node.Lat, node.Lon);
+                layerParam.Value = node.Tags.TryGetValue("layer", out string? value) ? value : 0;
                 await insertNodeCommand.ExecuteNonQueryAsync();
             }
             await transaction.CommitAsync();
@@ -182,6 +194,33 @@ public class SqliteStore : ILocationSearch
             using var transaction = connection.BeginTransaction();
             int noCoord = 0;
             int wayTotal = 0;
+
+            using var insertWayCommand = connection.CreateCommand();
+            insertWayCommand.Transaction = transaction;
+            insertWayCommand.CommandText = @"
+            INSERT INTO way (id, visible, version, change_set, timestamp, user, uid, closed_loop, tags)
+                VALUES($id, $visible, $version, $change_set, $timestamp, $user, $uid, $closed_loop, $tags);
+            ";
+            var idParam = insertWayCommand.Parameters.Add("$id", SqliteType.Integer);
+            var visibleParam = insertWayCommand.Parameters.Add("$visible", SqliteType.Integer);
+            var versionParam = insertWayCommand.Parameters.Add("$version", SqliteType.Integer);
+            var changeSetParam = insertWayCommand.Parameters.Add("$change_set", SqliteType.Integer);
+            var timestampParam = insertWayCommand.Parameters.Add("$timestamp", SqliteType.Text);
+            var userParam = insertWayCommand.Parameters.Add("$user", SqliteType.Text);
+            var uidParam = insertWayCommand.Parameters.Add("$uid", SqliteType.Integer);
+            var closedLoopParam = insertWayCommand.Parameters.Add("$closed_loop", SqliteType.Integer);
+            var tagsParam = insertWayCommand.Parameters.Add("$tags", SqliteType.Text);
+
+
+            using var insertWayNodeCommand = connection.CreateCommand();
+            insertWayNodeCommand.CommandText = @"
+                    INSERT INTO way_node_map (way_id, node_id, ordinal)
+                        VALUES($way_id, $node_id, $ordinal);
+                    ";
+            var wayIdParam = insertWayNodeCommand.Parameters.Add("$way_id", SqliteType.Integer);
+            var nodeIdParam = insertWayNodeCommand.Parameters.Add("$node_id", SqliteType.Integer);
+            var ordinalParam = insertWayNodeCommand.Parameters.Add("$ordinal", SqliteType.Integer);
+
             foreach (var way in wayBatch)
             {
                 var wayNodes = way.NodeReferences.Select(id => nodes[id]).ToArray();
@@ -197,33 +236,23 @@ public class SqliteStore : ILocationSearch
 
                 wayTotal++;
 
-                using var insertWayCommand = connection.CreateCommand();
-                insertWayCommand.Transaction = transaction;
-                insertWayCommand.CommandText = @"
-                INSERT INTO way (id, visible, version, change_set, timestamp, user, uid, closed_loop, tags)
-                    VALUES($id, $visible, $version, $change_set, $timestamp, $user, $uid, $closed_loop, $tags);
-                ";
-                insertWayCommand.Parameters.AddWithValue("$id", way.Id);
-                insertWayCommand.Parameters.AddWithValue("$visible", way.Visible as object ?? DBNull.Value);
-                insertWayCommand.Parameters.AddWithValue("$version", way.Version as object ?? DBNull.Value);
-                insertWayCommand.Parameters.AddWithValue("$change_set", way.ChangeSet);
-                insertWayCommand.Parameters.AddWithValue("$timestamp", way.Timestamp?.ToString("yyyy-MM-ddTHH:mm:ssZ") as object ?? DBNull.Value);
-                insertWayCommand.Parameters.AddWithValue("$user", way.User as object ?? DBNull.Value);
-                insertWayCommand.Parameters.AddWithValue("$uid", way.Uid as object ?? DBNull.Value);
-                insertWayCommand.Parameters.AddWithValue("$closed_loop", closedLoop);
-                insertWayCommand.Parameters.AddWithValue("$tags", DictUtils.DictToString(way.Tags));
+                idParam.Value = way.Id;
+                visibleParam.Value = way.Visible as object ?? DBNull.Value;
+                versionParam.Value = way.Version as object ?? DBNull.Value;
+                changeSetParam.Value = way.ChangeSet as object ?? DBNull.Value;
+                timestampParam.Value = way.Timestamp?.ToString("yyyy-MM-ddTHH:mm:ssZ") as object ?? DBNull.Value;
+                userParam.Value = way.User as object ?? DBNull.Value;
+                uidParam.Value = way.Uid as object ?? DBNull.Value;
+                closedLoopParam.Value = closedLoop;
+                tagsParam.Value = DictUtils.DictToString(way.Tags);
+
                 await insertWayCommand.ExecuteNonQueryAsync();
 
                 foreach (var node in wayNodes.Select((e, i) => new { e.Id, ordinal = i }))
                 {
-                    using var insertWayNodeCommand = connection.CreateCommand();
-                    insertWayNodeCommand.CommandText = @"
-                    INSERT INTO way_node_map (way_id, node_id, ordinal)
-                        VALUES($way_id, $node_id, $ordinal);
-                    ";
-                    insertWayNodeCommand.Parameters.AddWithValue("$way_id", way.Id);
-                    insertWayNodeCommand.Parameters.AddWithValue("$node_id", node.Id);
-                    insertWayNodeCommand.Parameters.AddWithValue("$ordinal", node.ordinal);
+                    wayIdParam.Value = way.Id;
+                    nodeIdParam.Value = node.Id;
+                    ordinalParam.Value = node.ordinal;
                     await insertWayNodeCommand.ExecuteNonQueryAsync();
                 }
             }
@@ -358,37 +387,60 @@ public class SqliteStore : ILocationSearch
         using var connection = createConnection();
         using var transaction = connection.BeginTransaction();
 
+        using var insertAreaCommand = connection.CreateCommand();
+        insertAreaCommand.Transaction = transaction;
+        insertAreaCommand.CommandText = @"
+                    INSERT INTO area (source, visible, version, change_set, timestamp, user, uid, outer_coords, inner_coords, names, suggested_colour, tile_id, layer, height, min_height, roof_type, roof_height, roof_colour, roof_orientation, is_large, is_3d)
+                        VALUES($source, $visible, $version, $change_set, $timestamp, $user, $uid, $outer_coords, $inner_coords, $names, $suggested_colour, $tile_id, $layer, $height, $min_height, $roof_type, $roof_height, $roof_colour, $roof_orientation, $is_large, $is_3d);
+                    ";
+
+        var sourceParam = insertAreaCommand.Parameters.Add("$source", SqliteType.Text);
+        var visibleParam = insertAreaCommand.Parameters.Add("$visible", SqliteType.Integer);
+        var versionParam = insertAreaCommand.Parameters.Add("$version", SqliteType.Integer);
+        var changeSetParam = insertAreaCommand.Parameters.Add("$change_set", SqliteType.Integer);
+        var timestampParam = insertAreaCommand.Parameters.Add("$timestamp", SqliteType.Text);
+        var userParam = insertAreaCommand.Parameters.Add("$user", SqliteType.Text);
+        var uidParam = insertAreaCommand.Parameters.Add("$uid", SqliteType.Integer);
+        var outerCoordsParam = insertAreaCommand.Parameters.Add("$outer_coords", SqliteType.Text);
+        var innerCoordsParam = insertAreaCommand.Parameters.Add("$inner_coords", SqliteType.Text);
+        var namesParam = insertAreaCommand.Parameters.Add("$names", SqliteType.Text);
+        var suggestedColourParam = insertAreaCommand.Parameters.Add("$suggested_colour", SqliteType.Text);
+        var tileIdParam = insertAreaCommand.Parameters.Add("$tile_id", SqliteType.Integer);
+        var layerParam = insertAreaCommand.Parameters.Add("$layer", SqliteType.Integer);
+        var heightParam = insertAreaCommand.Parameters.Add("$height", SqliteType.Real);
+        var minHeight = insertAreaCommand.Parameters.Add("$min_height", SqliteType.Real);
+        var roofTypeParam = insertAreaCommand.Parameters.Add("$roof_type", SqliteType.Text);
+        var roofHeightParam = insertAreaCommand.Parameters.Add("$roof_height", SqliteType.Text);
+        var roofColourParam = insertAreaCommand.Parameters.Add("$roof_colour", SqliteType.Text);
+        var roofOrientationParam = insertAreaCommand.Parameters.Add("$roof_orientation", SqliteType.Text);
+        var isLargeParam = insertAreaCommand.Parameters.Add("$is_large", SqliteType.Integer);
+        var is3dParam = insertAreaCommand.Parameters.Add("$is_3d", SqliteType.Integer);
+
         foreach (var area in areaBatch)
         {
             var outerCoords = area.OuterCoordinates.AsString();
             var innerCoords = area.InnerCoordinates.AsString();
-            using var insertAreaCommand = connection.CreateCommand();
-            insertAreaCommand.Transaction = transaction;
-            insertAreaCommand.CommandText = @"
-                    INSERT INTO area (source, visible, version, change_set, timestamp, user, uid, outer_coords, inner_coords, names, suggested_colour, tile_id, layer, height, min_height, roof_type, roof_height, roof_colour, roof_orientation, is_large, is_3d)
-                        VALUES($source, $visible, $version, $change_set, $timestamp, $user, $uid, $outer_coords, $inner_coords, $names, $suggested_colour, $tile_id, $layer, $height, $min_height, $roof_type, $roof_height, $roof_colour, $roof_orientation, $is_large, $is_3d);
-                    ";
-            insertAreaCommand.Parameters.AddWithValue("$source", area.Source);
-            insertAreaCommand.Parameters.AddWithValue("$visible", area.Visible as object ?? DBNull.Value);
-            insertAreaCommand.Parameters.AddWithValue("$version", area.Version as object ?? DBNull.Value);
-            insertAreaCommand.Parameters.AddWithValue("$change_set", area.ChangeSet);
-            insertAreaCommand.Parameters.AddWithValue("$timestamp", area.Timestamp?.ToString("yyyy-MM-ddTHH:mm:ssZ") as object ?? DBNull.Value);
-            insertAreaCommand.Parameters.AddWithValue("$user", area.User as object ?? DBNull.Value);
-            insertAreaCommand.Parameters.AddWithValue("$uid", area.Uid as object ?? DBNull.Value);
-            insertAreaCommand.Parameters.AddWithValue("$outer_coords", outerCoords);
-            insertAreaCommand.Parameters.AddWithValue("$inner_coords", innerCoords);
-            insertAreaCommand.Parameters.AddWithValue("$names", area.Names.ArrayToString());
-            insertAreaCommand.Parameters.AddWithValue("$suggested_colour", area.SuggestedColour);
-            insertAreaCommand.Parameters.AddWithValue("$tile_id", area.TileId);
-            insertAreaCommand.Parameters.AddWithValue("$layer", area.Layer);
-            insertAreaCommand.Parameters.AddWithValue("$height", area.Height);
-            insertAreaCommand.Parameters.AddWithValue("$min_height", area.MinHeight);
-            insertAreaCommand.Parameters.AddWithValue("$roof_type", area.RoofType);
-            insertAreaCommand.Parameters.AddWithValue("$roof_height", area.RoofHeight);
-            insertAreaCommand.Parameters.AddWithValue("$roof_colour", area.RoofColour);
-            insertAreaCommand.Parameters.AddWithValue("$roof_orientation", area.RoofOrientation);
-            insertAreaCommand.Parameters.AddWithValue("$is_large", area.IsLarge);
-            insertAreaCommand.Parameters.AddWithValue("$is_3d", area.Is3d);
+            sourceParam.Value = area.Source;
+            visibleParam.Value = area.Visible as object ?? DBNull.Value;
+            versionParam.Value = area.Version as object ?? DBNull.Value;
+            changeSetParam.Value = area.ChangeSet as object ?? DBNull.Value;
+            timestampParam.Value = area.Timestamp?.ToString("yyyy-MM-ddTHH:mm:ssZ") as object ?? DBNull.Value;
+            userParam.Value = area.User as object ?? DBNull.Value;
+            uidParam.Value = area.Uid as object ?? DBNull.Value;
+            outerCoordsParam.Value = outerCoords;
+            innerCoordsParam.Value = innerCoords;
+            namesParam.Value = area.Names.ArrayToString();
+            suggestedColourParam.Value = area.SuggestedColour;
+            tileIdParam.Value = area.TileId;
+            layerParam.Value = area.Layer;
+            heightParam.Value = area.Height;
+            minHeight.Value = area.MinHeight;
+            roofTypeParam.Value = area.RoofType;
+            roofHeightParam.Value = area.RoofHeight;
+            roofColourParam.Value = area.RoofColour;
+            roofOrientationParam.Value = area.RoofOrientation;
+            isLargeParam.Value = area.IsLarge;
+            is3dParam.Value = area.Is3d;
 
             await insertAreaCommand.ExecuteNonQueryAsync();
         }
@@ -515,17 +567,20 @@ public class SqliteStore : ILocationSearch
         foreach (var searchIndexBatch in searchIndexEntries.Chunk(1000))
         {
             using var transaction = connection.BeginTransaction();
+            using var searchIndexCommand = connection.CreateCommand();
+            searchIndexCommand.Transaction = transaction;
+            searchIndexCommand.CommandText = @"
+                    INSERT INTO search_index (name, lat, lon)
+                    VALUES ($name, $lat, $lon);
+                ";
+            var nameParam = searchIndexCommand.Parameters.Add("$name", SqliteType.Text);
+            var latParam = searchIndexCommand.Parameters.Add("$lat", SqliteType.Real);
+            var lonParam = searchIndexCommand.Parameters.Add("$lon", SqliteType.Real);
             foreach (var searchIndexTuple in searchIndexBatch)
             {
-                using var searchIndexCommand = connection.CreateCommand();
-                searchIndexCommand.Transaction = transaction;
-                searchIndexCommand.CommandText = @"
-                        INSERT INTO search_index (name, lat, lon)
-                        VALUES ($name, $lat, $lon);
-                    ";
-                searchIndexCommand.Parameters.AddWithValue("$name", searchIndexTuple.Name);
-                searchIndexCommand.Parameters.AddWithValue("$lat", searchIndexTuple.Lat);
-                searchIndexCommand.Parameters.AddWithValue("$lon", searchIndexTuple.Lon);
+                nameParam.Value = searchIndexTuple.Name;
+                latParam.Value = searchIndexTuple.Lat;
+                lonParam.Value = searchIndexTuple.Lon;
 
                 searchIndexCommand.ExecuteNonQuery();
             }
@@ -554,26 +609,30 @@ public class SqliteStore : ILocationSearch
         await transaction.CommitAsync();
     }
 
-    public Task<long> FetchSizeBytes() {
+    public Task<long> FetchSizeBytes()
+    {
         var length = new FileInfo(FilePath).Length;
         return Task.FromResult(length);
     }
 
-    public async Task ClearNodes() {
+    public async Task ClearNodes()
+    {
         using var connection = createConnection();
         using var deleteNodeCommand = connection.CreateCommand();
         deleteNodeCommand.CommandText = @"DELETE FROM node;";
         await deleteNodeCommand.ExecuteNonQueryAsync();
     }
 
-    public async Task ClearWays() {
+    public async Task ClearWays()
+    {
         using var connection = createConnection();
         using var deleteWayCommand = connection.CreateCommand();
         deleteWayCommand.CommandText = @"DELETE FROM way;";
         await deleteWayCommand.ExecuteNonQueryAsync();
     }
 
-    public async Task CompressDatabase() {
+    public async Task CompressDatabase()
+    {
         using var connection = createConnection();
         using var command = connection.CreateCommand();
         command.CommandText = @"VACUUM;";

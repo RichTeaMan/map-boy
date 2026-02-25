@@ -166,29 +166,21 @@ public partial class WayRender : GodotObject
         }
 
         var meshes = new List<ArrayMesh>();
-
-        // TODO wtf is this loop for
-        foreach (var excluded_points in excluded_points_collection)
+        foreach (var excludedPoints in excluded_points_collection)
         {
-            var indices = Geometry2D.TriangulatePolygon(polygon_points);
-
-            if (indices.Count() == 0)
+            var indices = Geometry2D.TriangulatePolygon(excludedPoints);
+            if (indices.Count() > 0)
             {
-                GD.PrintErr($"Error: Triangulation 2D failed over {polygon_points.Count()} points.");
-                //for p in polygon_points:
-                //    print("%s, %s" % [p.x, p.y])
-                continue;
+                var vertices = excludedPoints.Select(p => new Vector3(p.X, 0, p.Y)).ToArray();
+                var mesh = BuildArrayMesh(vertices, indices);
+                meshes.Add(mesh);
             }
-
-            List<Vector3> vertices = new List<Vector3>();
-            foreach (var point in polygon_points)
+            else
             {
-                vertices.Add(new Vector3(point.X, 0, point.Y));
+                GD.PrintErr($"Error: Triangulation 2D failed over {excludedPoints.Count()} points.");
             }
-
-            var mesh = BuildArrayMesh(vertices, indices);
-            meshes.Add(mesh);
         }
+
         return meshes.ToArray();
     }
 

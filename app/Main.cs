@@ -129,18 +129,20 @@ public partial class Main : Node3D
         // purge map
         PurgeMapAreaNodes();
 
-        // camera movement
-        foreach (var controller in currentControlScheme.Controllers)
-        {
-            controller.Control(currentControlScheme.Camera, Cameras, delta, GetViewport());
-        }
+        if (!global.IsTextFocused) {
+            // camera movement
+            foreach (var controller in currentControlScheme.Controllers)
+            {
+                controller.Control(currentControlScheme.Camera, Cameras, delta, GetViewport());
+            }
 
-        if (Input.IsActionJustPressed("camera_change"))
-        {
-            var currentSchemeId = controlSchemes.Index().First(c => c.Item == currentControlScheme).Index;
-            var nextSchemeId = (currentSchemeId + 1) % controlSchemes.Count();
-            var nextScheme = controlSchemes[nextSchemeId];
-            SwitchToControlScheme(nextScheme);
+            if (Input.IsActionJustPressed("camera_change"))
+            {
+                var currentSchemeId = controlSchemes.Index().First(c => c.Item == currentControlScheme).Index;
+                var nextSchemeId = (currentSchemeId + 1) % controlSchemes.Count();
+                var nextScheme = controlSchemes[nextSchemeId];
+                SwitchToControlScheme(nextScheme);
+            }
         }
         RefreshTileQueue();
     }

@@ -77,3 +77,9 @@ func add_row(name: String, lat: float, lon: float):
         queue_free()
     ui_button.pressed.connect(button_callback)
     %result_rows.add_child(ui_row)
+
+func _on_input_teleport_focus_entered() -> void:
+    global.TextFocused()
+
+func _on_input_teleport_focus_exited() -> void:
+    global.TextUnfocused()

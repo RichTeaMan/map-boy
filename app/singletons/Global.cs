@@ -7,6 +7,10 @@ public partial class Global : Node
 
     public bool MouseCaptured { get; private set; } = false;
 
+    public bool IsTextFocused { get; private set; } = false;
+
+    private bool captureMouseAfterTestFocused = false;
+
     [Signal]
     public delegate void TeleportEventHandler(double lat, double lon);
 
@@ -19,7 +23,8 @@ public partial class Global : Node
             AddChild(teleportUi);
         }
 
-        if (Input.IsActionPressed("quit")){
+        if (Input.IsActionPressed("quit"))
+        {
             GetTree().Quit();
         }
     }
@@ -64,5 +69,33 @@ public partial class Global : Node
     {
         Input.MouseMode = Input.MouseModeEnum.Visible;
         MouseCaptured = false;
+    }
+
+    /// <summary>
+    /// Signals that keystrokes should be registered for text entry and not movement.
+    /// 
+    /// Releases the mouse, if currently captured.
+    /// </summary>
+    public void TextFocused()
+    {
+        IsTextFocused = true;
+        captureMouseAfterTestFocused = false;
+        if (MouseCaptured) {
+            captureMouseAfterTestFocused = true;
+            ReleaseMouse();
+        }
+    }
+
+    /// <summary>
+    /// Signals that keystrokes should be controlling movement again.
+    /// 
+    /// Captures the mouse if the mouse was captured previously.
+    /// </summary>
+    public void TextUnfocused()
+    {
+        IsTextFocused = false;
+        if (captureMouseAfterTestFocused) {
+            CaptureMouse();
+        }
     }
 }

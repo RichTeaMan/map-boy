@@ -18,6 +18,10 @@ public partial class Global : Node
             var teleportUi = GD.Load<PackedScene>("res://ui/modals/teleport_modal.tscn").Instantiate();
             AddChild(teleportUi);
         }
+
+        if (Input.IsActionPressed("quit")){
+            GetTree().Quit();
+        }
     }
 
     public void DoTeleport(double lat, double lon)

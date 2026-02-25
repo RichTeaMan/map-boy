@@ -1,34 +1,32 @@
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using Godot;
 using MapBoy.Models;
 
 public partial class Main : Node3D
 {
+    private double layerFactor = 0.1;
 
-    double layer_factor = 0.1;
+    private ControlScheme[] controlSchemes = [];
+    private ControlScheme currentControlScheme;
 
-    ControlScheme[] control_schemes = [];
-    ControlScheme current_control_scheme;
+    private readonly HashSet<long> loadedTiles = new HashSet<long>();
+    private readonly HashSet<long> loadedLargeAreaIds = new HashSet<long>();
 
-    private HashSet<long> loaded_tiles = new HashSet<long>();
-    private HashSet<long> loaded_large_area_ids = new HashSet<long>();
-
-    private Queue<long> area_queue = new Queue<long>();
-    private Queue<long> large_area_queue = new Queue<long>();
-    bool area_pending = false;
-    bool tiles_pending = false;
-    double? last_pos_lat = null;
-    double? last_pos_long = null;
-    int last_purge_index = 0;
+    private Queue<long> areaQueue = new Queue<long>();
+    private Queue<long> largeAreaQueue = new Queue<long>();
+    private bool areaPending = false;
+    private bool tilesPending = false;
+    private double? lastPosLat = null;
+    private double? lastPosLong = null;
+    private int lastPurgeIndex = 0;
 
     /// <summary>
     /// Maximum number of entities to check for purging in a single tick
     /// </summary>
-    int purge_amount = 5;
+    private int purgeAmount = 5;
 
-    double load_window = 0.02;
+    double loadWindow = 0.02;
 
     private Global global;
 
@@ -46,80 +44,56 @@ public partial class Main : Node3D
     {
         global = GetNode<Global>("/root/Global");
 
-        var street_scheme = new ControlScheme();
-        street_scheme.Camera = GetNode<Camera3D>("%street_camera");
-        street_scheme.Controllers = [
+        var streetScheme = new ControlScheme();
+        streetScheme.Camera = GetNode<Camera3D>("%street_camera");
+        streetScheme.Controllers = [
             new StreetKeyboardController(),
             new StreetMouseController()
         ];
-        street_scheme.LocksMouse = true;
-        var satellite_scheme = new ControlScheme();
-        satellite_scheme.Camera = GetNode<Camera3D>("%satellite_camera");
-        satellite_scheme.Controllers = [
+        streetScheme.LocksMouse = true;
+        var satelliteScheme = new ControlScheme();
+        satelliteScheme.Camera = GetNode<Camera3D>("%satellite_camera");
+        satelliteScheme.Controllers = [
             new SatelliteKeyboardController(),
             new SatelliteMouseController(),
         ];
-        satellite_scheme.LocksMouse = false;
-        control_schemes = [
-            street_scheme,
-            satellite_scheme
+        satelliteScheme.LocksMouse = false;
+        controlSchemes = [
+            streetScheme,
+            satelliteScheme
         ];
-        switch_to_control_scheme(street_scheme);
+        SwitchToControlScheme(streetScheme);
 
         var start = Global.LatLonToVector(51.4995145764631, -0.126637687351658);
         GetNode<Node3D>("%cameras").Position = new Vector3(start.X, 0.0, start.Y);
-        var statCamPos = satellite_scheme.Camera.Position;
-        satellite_scheme.Camera.Position = new Vector3(statCamPos.X, 10.0, statCamPos.Z);
-        //%cameras.position.x = start.x
-        //%satellite_camera.position.y = 10.0
-        //%cameras.position.z = start.y
+        var statCamPos = satelliteScheme.Camera.Position;
+        satelliteScheme.Camera.Position = new Vector3(statCamPos.X, 10.0, statCamPos.Z);
 
-        //$Camera3D.look_at(Vector3(avg_lat, 0.0, avg_lon), Vector3(0,1,0))
-
-        //$areaHttpRequestPool.request_completed.connect(_on_areas_http_request_request_completed)
-        //$largeAreaHttpRequestPool.request_completed.connect(_on_large_areas_http_request_request_completed)
-        //$areasHttpRequest.request_completed.connect(_on_areas_http_request_request_completed)
-        //$tilesIdRangeHttpRequest.request_completed.connect(_on_tiles_http_request_request_completed)
-
-
-        global.ConnectTeleport(new Callable(this, MethodName._on_teleport));
+        global.ConnectTeleport(new Callable(this, MethodName.OnTeleport));
     }
 
     public override void _Process(double delta)
     {
-
         // load map
-        while (area_queue.Count > 0)
-        { // : # && $areaHttpRequestPool.is_ready()) {
-            var tileId = area_queue.Dequeue();
-            if (loaded_tiles.Contains(tileId))
+        while (areaQueue.Count > 0)
+        {
+            var tileId = areaQueue.Dequeue();
+            if (loadedTiles.Contains(tileId))
             {
                 continue;
             }
-            //print("Requesting area for tile %s." % tile_id)
-            //$areaHttpRequestPool.request_now(api.get_areas_by_tile_id(tile_info.tile_id))
             api.QueueGetAreaByTileId(tileId);
-
-
-            //var tile_marker = new TileMarkerNode();
-            //tile_marker.tile_id = tile_info.tile_id;
-            //tile_marker.position = tile_info.tile_position;
-            //tile_marker.name = $"tile-{tile_info.tile_id}";
-            //TileMarkers.AddChild(tile_marker);
-            loaded_tiles.Add(tileId);
+            loadedTiles.Add(tileId);
         }
-        while (large_area_queue.Count > 0)
-        { //: # && $largeAreaHttpRequestPool.is_ready():
-            var large_area_id = large_area_queue.Dequeue();
-            if (loaded_large_area_ids.Contains(large_area_id))
+        while (largeAreaQueue.Count > 0)
+        {
+            var largeAreaId = largeAreaQueue.Dequeue();
+            if (loadedLargeAreaIds.Contains(largeAreaId))
             {
                 continue;
             }
-            //print("Requesting area for tile %s." % tile_id)
-            //$largeAreaHttpRequestPool.request_now(api.get_areas_by_ids(large_area_id))
-            //var tile_marker = TileMarkerNode.new()
-            api.QueueGetAreaById(large_area_id);
-            loaded_large_area_ids.Add(large_area_id);
+            api.QueueGetAreaById(largeAreaId);
+            loadedLargeAreaIds.Add(largeAreaId);
         }
 
         while (true)
@@ -129,7 +103,7 @@ public partial class Main : Node3D
             {
                 break;
             }
-            _on_areas_completed(response);
+            OnAreasCompleted(response);
         }
 
         while (true)
@@ -139,7 +113,7 @@ public partial class Main : Node3D
             {
                 break;
             }
-            create_areas(response);
+            CreateAreas(response);
         }
 
         while (true)
@@ -149,180 +123,149 @@ public partial class Main : Node3D
             {
                 break;
             }
-            _on_tiles_http_request_request_completed(response);
+            OnTilesHttpRequestCompleted(response);
         }
 
         // purge map
-        purge_map_area_nodes();
+        PurgeMapAreaNodes();
 
         // camera movement
-        foreach (var controller in current_control_scheme.Controllers)
+        foreach (var controller in currentControlScheme.Controllers)
         {
-            controller.Control(current_control_scheme.Camera, Cameras, delta, GetViewport());
+            controller.Control(currentControlScheme.Camera, Cameras, delta, GetViewport());
         }
 
         if (Input.IsActionJustPressed("camera_change"))
         {
-            var current_scheme_id = control_schemes.Index().First(c => c.Item == current_control_scheme).Index;
-            var next_scheme_id = (current_scheme_id + 1) % control_schemes.Count();
-            var next_scheme = control_schemes[next_scheme_id];
-            switch_to_control_scheme(next_scheme);
+            var currentSchemeId = controlSchemes.Index().First(c => c.Item == currentControlScheme).Index;
+            var nextSchemeId = (currentSchemeId + 1) % controlSchemes.Count();
+            var nextScheme = controlSchemes[nextSchemeId];
+            SwitchToControlScheme(nextScheme);
         }
-        refresh_tile_queue();
+        RefreshTileQueue();
     }
 
-    private void switch_to_control_scheme(ControlScheme new_control_scheme)
+    private void SwitchToControlScheme(ControlScheme newControlScheme)
     {
-        foreach (var control_scheme in control_schemes)
+        foreach (var controlScheme in controlSchemes)
         {
-            control_scheme.Camera.Current = false;
+            controlScheme.Camera.Current = false;
         }
-        new_control_scheme.Camera.Current = true;
-        if (new_control_scheme.LocksMouse)
+        newControlScheme.Camera.Current = true;
+        if (newControlScheme.LocksMouse)
         {
-            global.capture_mouse();
+            global.CaptureMouse();
         }
         else
         {
-            global.release_mouse();
+            global.ReleaseMouse();
         }
-        current_control_scheme = new_control_scheme;
+        currentControlScheme = newControlScheme;
     }
 
     public override void _Input(InputEvent inputEvent)
     {
         base._Input(inputEvent);
-        //var is_street_mode = GetNode<Camera3D>("%street_camera").Current;
-        //var is_satellite_mode = GetNode<Camera3D>("%satellite_camera").Current;
-        foreach (var controller in current_control_scheme.Controllers)
+        foreach (var controller in currentControlScheme.Controllers)
         {
             controller.HandleInput(inputEvent);
         }
     }
 
-    private void refresh_tile_queue()
+    private void RefreshTileQueue()
     {
-        if (tiles_pending)
+        if (tilesPending)
         {
             return;
         }
 
         // search for tiles 0.1 degrees around camera postion, which is very roughly similar to 1.7km
-        var deg_range = load_window;
-        //var current_lat = %cameras.position.x / Global.coord_factor
-        //var current_lon = %cameras.position.z / Global.coord_factor
+        var degRange = loadWindow;
 
-        var camera_coord = global.vector_to_lat_lon(new Vector2(Cameras.Position.X, Cameras.Position.Z));
-        var current_lat = camera_coord.X;
-        var current_lon = camera_coord.Y;
+        var cameraCoord = global.VectorToLatLon(new Vector2(Cameras.Position.X, Cameras.Position.Z));
+        var currentLat = cameraCoord.X;
+        var currentLon = cameraCoord.Y;
 
-        if (last_pos_lat == current_lat && last_pos_long == current_lon)
+        if (lastPosLat == currentLat && lastPosLong == currentLon)
         {
             return;
         }
 
-        var lat1 = current_lat - deg_range;
-        var lon1 = current_lon - deg_range;
-        var lat2 = current_lat + deg_range;
-        var lon2 = current_lon + deg_range;
-        //$tilesIdRangeHttpRequest.request(api.get_tile_id_range(lat1, lon1, lat2, lon2))
+        var lat1 = currentLat - degRange;
+        var lon1 = currentLon - degRange;
+        var lat2 = currentLat + degRange;
+        var lon2 = currentLon + degRange;
         api.QueueGetTileIdRange(lat1, lon1, lat2, lon2);
-        tiles_pending = true;
+        tilesPending = true;
 
-        last_pos_lat = current_lat;
-        last_pos_long = current_lon;
+        lastPosLat = currentLat;
+        lastPosLong = currentLon;
     }
 
-    private void purge_map_area_nodes()
+    private void PurgeMapAreaNodes()
     {
         // search for tiles 0.1 degrees around camera postion, which is very roughly similar to 1.7km
-        var deg_range = load_window * global.coord_factor * 2.0;
+        var degRange = loadWindow * global.coordFactor * 2.0;
         var current_lat = Cameras.Position.X;
         var current_lon = Cameras.Position.Z;
 
 
-        var lat1 = current_lat - deg_range;
-        var lon1 = current_lon - deg_range;
-        var lat2 = current_lat + deg_range;
-        var lon2 = current_lon + deg_range;
+        var lat1 = current_lat - degRange;
+        var lon1 = current_lon - degRange;
+        var lat2 = current_lat + degRange;
+        var lon2 = current_lon + degRange;
 
-        var map_area_nodes = Map.GetChildren().Cast<MapAreaNode>().ToArray();
-        var purge_limit = Mathf.Min(map_area_nodes.Count(), last_purge_index + purge_amount);
-        var i = last_purge_index;
-        //var min_vert: Vector2 = Vector2()
-        //var max_vert: Vector2 = Vector2()
-        while (i < purge_limit)
+        var mapAreaNodes = Map.GetChildren().Cast<MapAreaNode>().ToArray();
+        var purgeLimit = Mathf.Min(mapAreaNodes.Count(), lastPurgeIndex + purgeAmount);
+        var i = lastPurgeIndex;
+        while (i < purgeLimit)
         {
-            var map_area_node = map_area_nodes[i];
-            if (map_area_node.IsLarge)
+            var mapAreaNode = mapAreaNodes[i];
+            if (mapAreaNode.IsLarge)
             {
-                if (map_area_node.MaxVert.X < lat1 || map_area_node.MinVert.X > lat2 || map_area_node.MaxVert.Y < lon1 || map_area_node.MinVert.Y > lon2)
+                if (mapAreaNode.MaxVert.X < lat1 || mapAreaNode.MinVert.X > lat2 || mapAreaNode.MaxVert.Y < lon1 || mapAreaNode.MinVert.Y > lon2)
                 {
-                    loaded_large_area_ids.Remove(map_area_node.AreaId);
-                    map_area_node.QueueFree();
+                    loadedLargeAreaIds.Remove(mapAreaNode.AreaId);
+                    mapAreaNode.QueueFree();
                 }
             }
-            else if (map_area_node.Position.X < lat1 || map_area_node.Position.X > lat2 || map_area_node.Position.Z < lon1 || map_area_node.Position.Z > lon2)
+            else if (mapAreaNode.Position.X < lat1 || mapAreaNode.Position.X > lat2 || mapAreaNode.Position.Z < lon1 || mapAreaNode.Position.Z > lon2)
             {
-                map_area_node.QueueFree();
+                mapAreaNode.QueueFree();
             }
             i += 1;
         }
 
-        last_purge_index += purge_limit;
-        if (last_purge_index > map_area_nodes.Count())
+        lastPurgeIndex += purgeLimit;
+        if (lastPurgeIndex > mapAreaNodes.Length)
         {
-            last_purge_index = 0;
+            lastPurgeIndex = 0;
         }
-        foreach (var tile_marker_node in TileMarkers.GetChildren().Cast<TileMarkerNode>())
+        foreach (var tileMarkerNode in TileMarkers.GetChildren().Cast<TileMarkerNode>())
         {
-            if (tile_marker_node.Position.X < lat1 || tile_marker_node.Position.X > lat2 || tile_marker_node.Position.Z < lon1 || tile_marker_node.Position.Z > lon2)
+            if (tileMarkerNode.Position.X < lat1 || tileMarkerNode.Position.X > lat2 || tileMarkerNode.Position.Z < lon1 || tileMarkerNode.Position.Z > lon2)
             {
-                tile_marker_node.QueueFree();
-                loaded_tiles.Remove(tile_marker_node.TileId);
+                tileMarkerNode.QueueFree();
+                loadedTiles.Remove(tileMarkerNode.TileId);
             }
         }
     }
-    /*
-    func _on_areas_http_request_request_completed(_result, _response_code, _headers, body):
-        #print("area response...")
-        var area_response = JSON.parse_string(body.get_string_from_utf8())
-        var areas = area_response.areas
-        var large_area_ids = area_response.largeAreaIds
-        for large_area_id: int in large_area_ids:
-            if !loaded_large_area_ids.has(large_area_id):
-                large_area_queue.append(large_area_id)
-        create_areas(areas)
 
-        #print("area response processed")
-        area_pending = false
-    */
-
-    private void _on_areas_completed(AreaContainer area_response)
+    private void OnAreasCompleted(AreaContainer areaResponse)
     {
-        //print("area response...")
-        var areas = area_response.Areas;
-        var large_area_ids = area_response.LargeAreaIds;
-        foreach (var large_area_id in large_area_ids)
+        var areas = areaResponse.Areas;
+        foreach (var largeAreaId in areaResponse.LargeAreaIds)
         {
-            if (!loaded_large_area_ids.Contains(large_area_id))
+            if (!loadedLargeAreaIds.Contains(largeAreaId))
             {
-                large_area_queue.Enqueue(large_area_id);
+                largeAreaQueue.Enqueue(largeAreaId);
             }
         }
-        create_areas(areas);
-
-        //print("area response processed")
-        area_pending = false;
+        CreateAreas(areas);
+        areaPending = false;
     }
 
-    /*
-    func _on_large_areas_http_request_request_completed(_result, _response_code, _headers, body):
-        var areas = JSON.parse_string(body.get_string_from_utf8())
-        create_areas(areas)
-    */
-
-    private void create_areas(Area[] areas)
+    private void CreateAreas(Area[] areas)
     {
         if (areas == null)
         {
@@ -330,34 +273,31 @@ public partial class Main : Node3D
         }
         foreach (var area in areas)
         {
-            MapAreaNode area_node = wayRender.CreateAreaNode(area);
-            if (area_node != null)
+            MapAreaNode areaNode = wayRender.CreateAreaNode(area);
+            if (areaNode != null)
             {
-                Map.AddChild(area_node);
+                Map.AddChild(areaNode);
             }
         }
     }
 
 
-    private void _on_tiles_http_request_request_completed(TileContainer tileResponse)
+    private void OnTilesHttpRequestCompleted(TileContainer tileResponse)
     {
-        //print("tile response...")
-        area_queue.Clear();
-        //$areaHttpRequestPool.clear_queue()
+        areaQueue.Clear();
         foreach (var tile in tileResponse.Tiles)
         {
-            var tile_id = tile.Id;
-            if (loaded_tiles.Contains(tile_id))
+            if (loadedTiles.Contains(tile.Id))
             {
                 continue;
             }
-            area_queue.Enqueue(tile_id);
+            areaQueue.Enqueue(tile.Id);
         }
         //print("tile response processed")
-        tiles_pending = false;
+        tilesPending = false;
     }
 
-    private void _on_teleport(double lat, double lon)
+    private void OnTeleport(double lat, double lon)
     {
         var v2 = Global.LatLonToVector(lat, lon);
         var position = Cameras.Position;

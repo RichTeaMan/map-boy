@@ -3,20 +3,20 @@ using Godot;
 public partial class BuildInfo : CanvasLayer
 {
 
-    private string commit_hash = "dev";
-    private string build_time = "dev";
+    private string commitHash = "dev";
+    private string buildTime = "dev";
 
-    private RichTextLabel buildLabel => GetNode<RichTextLabel>("%build_label");
+    private RichTextLabel BuildLabel => GetNode<RichTextLabel>("%build_label");
 
-    private RichTextLabel fpsLabel => GetNode<RichTextLabel>("%fps_label");
+    private RichTextLabel FpsLabel => GetNode<RichTextLabel>("%fps_label");
 
     public override void _Ready()
     {
-        buildLabel.Text = $"Build hash: {commit_hash} | Build date: {build_time}";
+        BuildLabel.Text = $"Build hash: {commitHash} | Build date: {buildTime}";
     }
 
     public override void _Process(double _delta)
     {
-        fpsLabel.Text = $"FPS: {(int)Engine.GetFramesPerSecond()}";
+        FpsLabel.Text = $"FPS: {(int)Engine.GetFramesPerSecond()}";
     }
 }

@@ -18,13 +18,13 @@ public partial class Api : GodotObject
 {
     private string baseUrl = null;
 
-    private Queue<AreaContainer> areaContainerQueue = new Queue<AreaContainer>();
+    private readonly Queue<AreaContainer> areaContainerQueue = new Queue<AreaContainer>();
 
-    private Queue<TileContainer> tileContainerQueue = new Queue<TileContainer>();
+    private readonly Queue<TileContainer> tileContainerQueue = new Queue<TileContainer>();
 
-    private Queue<Area[]> areasQueue = new Queue<Area[]>();
+    private readonly Queue<Area[]> areasQueue = new Queue<Area[]>();
 
-    private Http.HttpClient httpClient = new Http.HttpClient();
+    private readonly Http.HttpClient httpClient = new Http.HttpClient();
 
     private T DequeueOrNull<T>(Queue<T> queue) where T : class {
         if (queue.Count > 0) {
@@ -65,19 +65,13 @@ public partial class Api : GodotObject
         return baseUrl;
     }
 
-
-    public string get_tile_id_range(double lat1, double lon1, double lat2, double lon2)
-    {
-        return $"{getBase()}/tileIdRange/{r(lat1)}/{r(lon1)}/{r(lat2)}/{r(lon2)}";
-    }
-
     public void QueueGetTileIdRange(double lat1, double lon1, double lat2, double lon2)
     {
-        var cb = (TileContainer tileContainer) =>
+        void cb(TileContainer tileContainer)
         {
             tileContainerQueue.Enqueue(tileContainer);
-        };
-        queueRequest(get_tile_id_range(lat1, lon1, lat2, lon2), cb);
+        }
+        queueRequest($"{getBase()}/tileIdRange/{r(lat1)}/{r(lon1)}/{r(lat2)}/{r(lon2)}", (Action<TileContainer>)cb);
     }
 
     public TileContainer DequeueGetTileIdRange()
@@ -89,11 +83,6 @@ public partial class Api : GodotObject
     {
         var tileContainer = DequeueGetTileIdRange();
         return GodotUtils.ToGodotVariant(tileContainer);
-    }
-
-    public string get_areas_by_tile_id(long tile_id)
-    {
-        return $"{getBase()}/areas?tileId={tile_id}";
     }
 
     private void queueRequest<T>(string url, Action<T> callback)
@@ -115,11 +104,11 @@ public partial class Api : GodotObject
 
     public void QueueGetAreaByTileId(long tileId)
     {
-        var cb = (AreaContainer areaContainer) =>
+        void cb(AreaContainer areaContainer)
         {
             areaContainerQueue.Enqueue(areaContainer);
-        };
-        queueRequest(get_areas_by_tile_id(tileId), cb);
+        }
+        queueRequest($"{getBase()}/areas?tileId={tileId}", (Action<AreaContainer>)cb);
     }
 
     public AreaContainer DequeueGetAreaByTileId()
@@ -133,19 +122,13 @@ public partial class Api : GodotObject
         return GodotUtils.ToGodotVariant(areaContainer);
     }
 
-
-    public string get_areas_by_ids(long area_id)
+    public void QueueGetAreaById(long areaId)
     {
-        return $"{getBase()}/areasByIds?ids={area_id}";
-    }
-
-    public void QueueGetAreaById(long tileId)
-    {
-        var cb = (Area[] areas) =>
+        void cb(Area[] areas)
         {
             areasQueue.Enqueue(areas);
-        };
-        queueRequest(get_areas_by_ids(tileId), cb);
+        }
+        queueRequest($"{getBase()}/areasByIds?ids={areaId}", (Action<Area[]>)cb);
     }
 
     public Area[] DequeueGetAreaById()

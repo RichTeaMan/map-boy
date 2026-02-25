@@ -3,8 +3,17 @@ extends Window
 var search_pending = false
 var new_search_required = false
 
+var api
+var global
+
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:
+
+    global = $"/root/Global"
+
+    var api_class = load("res://singletons/Api.cs")
+    api = api_class.new()
+    
     close_requested.connect(_on_cancel_pressed)
     %btn_cancel.pressed.connect(_on_cancel_pressed)
     %input_teleport.text_changed.connect(_on_input_changed)
@@ -17,7 +26,7 @@ func _process(_delta: float) -> void:
     if !search_pending && new_search_required:
         new_search_required = false
         search_pending = true
-        %http_request.request(Api.search(%input_teleport.text.strip_edges()))
+        %http_request.request(api.search(%input_teleport.text.strip_edges()))
 
 func _on_input_changed(_new_text) -> void:
     if %input_teleport.text.strip_edges() == "":
@@ -64,7 +73,7 @@ func add_row(name: String, lat: float, lon: float):
     ui_row.add_child(ui_button)
     ui_button.text = "Teleport"
     var button_callback = func():
-        Global.do_teleport(lat, lon)
+        global.DoTeleport(lat, lon)
         queue_free()
     ui_button.pressed.connect(button_callback)
     %result_rows.add_child(ui_row)

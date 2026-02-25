@@ -1,22 +1,22 @@
-[gd_scene load_steps=2 format=3 uid="uid://bcjhed8jlyynu"]
+[gd_scene format=3 uid="uid://bcjhed8jlyynu"]
 
-[ext_resource type="Script" uid="uid://sjk6amjuej8n" path="res://singletons/build_info.gd" id="1"]
+[ext_resource type="Script" uid="uid://b0uwlou3eyhx5" path="res://singletons/BuildInfo.cs" id="1_pk8eh"]
 
-[node name="build_info" type="CanvasLayer"]
+[node name="build_info" type="CanvasLayer" unique_id=314295007]
 layer = 128
-script = ExtResource("1")
+script = ExtResource("1_pk8eh")
 
-[node name="gui" type="MarginContainer" parent="."]
+[node name="gui" type="MarginContainer" parent="." unique_id=244739]
 offset_right = 1918.0
 offset_bottom = 40.0
 mouse_filter = 2
 
-[node name="build_label" type="RichTextLabel" parent="gui"]
+[node name="build_label" type="RichTextLabel" parent="gui" unique_id=150930526]
 unique_name_in_owner = true
 layout_mode = 2
 mouse_filter = 2
 
-[node name="MarginContainer" type="MarginContainer" parent="."]
+[node name="MarginContainer" type="MarginContainer" parent="." unique_id=240739545]
 anchors_preset = 1
 anchor_left = 1.0
 anchor_right = 1.0
@@ -24,7 +24,7 @@ offset_left = -116.0
 offset_bottom = 40.0
 grow_horizontal = 0
 
-[node name="fps_label" type="RichTextLabel" parent="MarginContainer"]
+[node name="fps_label" type="RichTextLabel" parent="MarginContainer" unique_id=1897683702]
 unique_name_in_owner = true
 layout_mode = 2
 text = "FPS: 0"

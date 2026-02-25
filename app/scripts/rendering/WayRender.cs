@@ -165,7 +165,7 @@ public partial class WayRender : GodotObject
             excluded_points_collection = exclude_results;
         }
 
-        ArrayMesh[] meshes = [];
+        var meshes = new List<ArrayMesh>();
 
         // TODO wtf is this loop for
         foreach (var excluded_points in excluded_points_collection)
@@ -180,26 +180,16 @@ public partial class WayRender : GodotObject
                 continue;
             }
 
-            Godot.Collections.Array arrays = [];
-            //arrays.Resize(Mesh.ARRAY_MAX)
-            arrays.Resize((int)Mesh.ArrayType.Max);
-
             List<Vector3> vertices = new List<Vector3>();
             foreach (var point in polygon_points)
             {
                 vertices.Add(new Vector3(point.X, 0, point.Y));
             }
 
-            //arrays[Mesh.ARRAY_VERTEX] = vertices
-            //arrays[Mesh.ARRAY_INDEX] = indices
-            arrays[(int)Mesh.ArrayType.Vertex] = vertices.ToArray();
-            arrays[(int)Mesh.ArrayType.Index] = indices;
-
-            var mesh = new ArrayMesh();
-            mesh.AddSurfaceFromArrays(PRIMITIVE_TRIANGLES, arrays);
-            meshes.Append(mesh);
+            var mesh = BuildArrayMesh(vertices, indices);
+            meshes.Add(mesh);
         }
-        return meshes;
+        return meshes.ToArray();
     }
 
     private ArrayMesh create_3d_mesh_from_polygon(Vector2[] polygon_points, double height)

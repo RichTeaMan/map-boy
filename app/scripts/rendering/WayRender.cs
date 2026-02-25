@@ -284,7 +284,7 @@ public partial class WayRender : GodotObject
             }
             centre = new Vector2(centre.X / polygonPoints.Length, centre.Y / polygonPoints.Length);
             var centreIndex = roofVertices.Count;
-            roofVertices.Append(new Vector3(centre.X, area.RoofHeight, centre.Y));
+            roofVertices.Add(new Vector3(centre.X, area.RoofHeight, centre.Y));
             var roofIndices = new List<int>();
 
             foreach (var i in Enumerable.Range(0, polygonPoints.Length))

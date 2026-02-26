@@ -1,6 +1,4 @@
 using System.Drawing;
-using System.Runtime.InteropServices;
-using System.Windows.Markup;
 
 namespace OsmTool;
 

@@ -2,7 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Net.Http.Json;
-using System.Text.Json;
+using System.Threading.Tasks;
 using Godot;
 using MapBoy.Models;
 using Http = System.Net.Http;
@@ -19,8 +19,10 @@ public partial class Api : GodotObject
 
     private readonly Http.HttpClient httpClient = new Http.HttpClient();
 
-    private T DequeueOrNull<T>(Queue<T> queue) where T : class {
-        if (queue.Count > 0) {
+    private T DequeueOrNull<T>(Queue<T> queue) where T : class
+    {
+        if (queue.Count > 0)
+        {
             return queue.Dequeue();
         }
         return null;
@@ -56,15 +58,28 @@ public partial class Api : GodotObject
     {
         httpClient.GetAsync(url).ContinueWith(async t =>
         {
-            // TODO error handling
-            if (t.Result.IsSuccessStatusCode)
+            bool retry = true;
+            if (t.IsCompletedSuccessfully)
             {
-                var content = await t.Result.Content.ReadFromJsonAsync<T>();
-                callback(content);
+                if (t.Result.IsSuccessStatusCode)
+                {
+                    var content = await t.Result.Content.ReadFromJsonAsync<T>();
+                    callback(content);
+                    retry = false;
+                }
+                else
+                {
+                    GD.PrintErr($"Non 200 status '{t.Result.StatusCode}' for {url}. Trying again in 5 seconds...");
+                }
             }
-            else
+            if (t.IsFaulted)
             {
-                GD.PrintErr($"Non 200 status '{t.Result.StatusCode}' for {url}.");
+                GD.PrintErr($"Exception getting {url} [{t.Exception?.Message}]. Trying again in 5 seconds...");
+            }
+            if (retry)
+            {
+                await Task.Delay(5000);
+                queueRequest(url, callback);
             }
         });
     }

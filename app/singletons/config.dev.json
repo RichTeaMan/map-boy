@@ -1,4 +1,4 @@
 {
-    "api_url": "http://localhost:5291/api",
-    "calculate_web_host": false
+    "ApiUrl": "http://localhost:5291/api",
+    "CalculateWebHost": false
 }

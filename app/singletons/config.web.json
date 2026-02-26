@@ -1,4 +1,4 @@
 {
-    "api_url": "/api",
-    "calculate_web_host": true
+    "ApiUrl": "/api",
+    "CalculateWebHost": true
 }

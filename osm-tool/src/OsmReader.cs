@@ -20,15 +20,6 @@ public class OsmReader : IReader
                 double lat = double.Parse(reader.GetAttribute("lat")!);
                 double lon = double.Parse(reader.GetAttribute("lon")!);
                 bool? visible = reader.GetAttributeNullableValue<bool>("visible");
-                int? version = reader.GetAttributeNullableValue<int>("version");
-                long? changeSet = reader.GetAttributeNullableValue<long>("changeset");
-                var timeStampValue = reader.GetAttribute("timestamp");
-                DateTimeOffset? timestamp = null;
-                if (timeStampValue != null)
-                {
-                    timestamp = DateTimeOffset.Parse(timeStampValue);
-                }
-                string? user = reader.GetAttribute("user");
                 long? uid = reader.GetAttributeNullableValue<long>("uid");
                 var tagDict = new Dictionary<string, string>();
 
@@ -53,10 +44,6 @@ public class OsmReader : IReader
                 {
                     Id = id,
                     Visible = visible,
-                    Version = version,
-                    ChangeSet = changeSet,
-                    Timestamp = timestamp,
-                    User = user,
                     Uid = uid,
                     Lat = lat,
                     Lon = lon,
@@ -79,15 +66,6 @@ public class OsmReader : IReader
             {
                 long id = long.Parse(reader.GetAttribute("id")!);
                 bool? visible = reader.GetAttributeNullableValue<bool>("visible");
-                int? version = reader.GetAttributeNullableValue<int>("version");
-                long? changeSet = reader.GetAttributeNullableValue<long>("changeset");
-                var timeStampValue = reader.GetAttribute("timestamp");
-                DateTimeOffset? timestamp = null;
-                if (timeStampValue != null)
-                {
-                    timestamp = DateTimeOffset.Parse(timeStampValue);
-                }
-                string? user = reader.GetAttribute("user");
                 long? uid = reader.GetAttributeNullableValue<long>("uid");
                 var tagDict = new Dictionary<string, string>();
                 var nodeReferences = new List<long>();
@@ -120,10 +98,6 @@ public class OsmReader : IReader
                 {
                     Id = id,
                     Visible = visible,
-                    Version = version,
-                    ChangeSet = changeSet,
-                    Timestamp = timestamp,
-                    User = user,
                     Uid = uid,
                     Tags = tagDict,
                     NodeReferences = nodeReferences.AsReadOnly()
@@ -145,15 +119,6 @@ public class OsmReader : IReader
             {
                 long id = long.Parse(reader.GetAttribute("id")!);
                 bool? visible = reader.GetAttributeNullableValue<bool>("visible");
-                int? version = reader.GetAttributeNullableValue<int>("version");
-                long? changeSet = reader.GetAttributeNullableValue<long>("changeset");
-                var timeStampValue = reader.GetAttribute("timestamp");
-                DateTimeOffset? timestamp = null;
-                if (timeStampValue != null)
-                {
-                    timestamp = DateTimeOffset.Parse(timeStampValue);
-                }
-                string? user = reader.GetAttribute("user");
                 long? uid = reader.GetAttributeNullableValue<long>("uid");
                 var tagDict = new Dictionary<string, string>();
                 var members = new List<OsmRelationMember>();
@@ -192,10 +157,6 @@ public class OsmReader : IReader
                 {
                     Id = id,
                     Visible = visible,
-                    Version = version,
-                    ChangeSet = changeSet,
-                    Timestamp = timestamp,
-                    User = user,
                     Uid = uid,
                     Tags = tagDict,
                     Members = members.AsReadOnly()

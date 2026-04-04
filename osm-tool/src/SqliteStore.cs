@@ -40,10 +40,6 @@ public class SqliteStore : ILocationSearch
             CREATE TABLE IF NOT EXISTS node (
             id INTEGER PRIMARY KEY,
             visible INTEGER NULL,
-            version INTEGER NULL,
-            change_set INTEGER NULL,
-            timestamp TEXT NULL,
-            user TEXT NULL,
             uid INTEGER NULL,
             lat REAL NOT NULL,
             lon REAL NOT NULL,
@@ -54,10 +50,6 @@ public class SqliteStore : ILocationSearch
 
         CREATE TABLE IF NOT EXISTS way (
             id INTEGER PRIMARY KEY,
-            visible INTEGER NULL,
-            version INTEGER NULL,
-            change_set INTEGER NULL,
-            timestamp TEXT NULL,
             user TEXT NOT NULL,
             uid INTEGER NULL,
             closed_loop INTEGER NOT NULL,
@@ -76,10 +68,6 @@ public class SqliteStore : ILocationSearch
             id INTEGER PRIMARY KEY,
             source TEXT NOT NULL,
             visible INTEGER NULL,
-            version INTEGER NULL,
-            change_set INTEGER NULL,
-            timestamp TEXT NULL,
-            user TEXT NOT NULL,
             uid INTEGER NULL,
             outer_coords TEXT NOT NULL,
             inner_coords TEXT NOT NULL,
@@ -119,16 +107,12 @@ public class SqliteStore : ILocationSearch
             using var insertNodeCommand = connection.CreateCommand();
             insertNodeCommand.Transaction = transaction;
             insertNodeCommand.CommandText = @"
-            INSERT INTO node (id, visible, version, change_set, timestamp, user, uid, lat, lon, tile_id, layer)
-                VALUES($id, $visible, $version, $change_set, $timestamp, $user, $uid, $lat, $lon, $tile_id, $layer);
+            INSERT INTO node (id, visible, uid, lat, lon, tile_id, layer)
+                VALUES($id, $visible, $uid, $lat, $lon, $tile_id, $layer);
             ";
 
             var idParam = insertNodeCommand.Parameters.Add("$id", SqliteType.Integer);
             var visibleParam = insertNodeCommand.Parameters.Add("$visible", SqliteType.Integer);
-            var versionParam = insertNodeCommand.Parameters.Add("$version", SqliteType.Integer);
-            var changeSetParam = insertNodeCommand.Parameters.Add("$change_set", SqliteType.Integer);
-            var timestampParam = insertNodeCommand.Parameters.Add("$timestamp", SqliteType.Text);
-            var userParam = insertNodeCommand.Parameters.Add("$user", SqliteType.Text);
             var uidParam = insertNodeCommand.Parameters.Add("$uid", SqliteType.Integer);
             var latParam = insertNodeCommand.Parameters.Add("$lat", SqliteType.Real);
             var lonParam = insertNodeCommand.Parameters.Add("$lon", SqliteType.Real);
@@ -138,10 +122,6 @@ public class SqliteStore : ILocationSearch
             {
                 idParam.Value = node.Id;
                 visibleParam.Value = node.Visible as object ?? DBNull.Value;
-                versionParam.Value = node.Version as object ?? DBNull.Value;
-                changeSetParam.Value = node.ChangeSet as object ?? DBNull.Value;
-                timestampParam.Value = node.Timestamp?.ToString("yyyy-MM-ddTHH:mm:ssZ") as object ?? DBNull.Value;
-                userParam.Value = node.User as object ?? DBNull.Value;
                 uidParam.Value = node.Uid as object ?? DBNull.Value;
                 latParam.Value = node.Lat;
                 lonParam.Value = node.Lon;
@@ -162,7 +142,7 @@ public class SqliteStore : ILocationSearch
         using var command = connection.CreateCommand();
         var q = string.Join(',', ids.Distinct());
         // I gave up making this parametered. nothing works
-        command.CommandText = @"SELECT id, visible, version, change_set, timestamp, user, uid, lat, lon FROM node WHERE id IN ($ids);".Replace("$ids", q);
+        command.CommandText = @"SELECT id, visible, uid, lat, lon FROM node WHERE id IN ($ids);".Replace("$ids", q);
 
         using var reader = await command.ExecuteReaderAsync();
         while (await reader.ReadAsync())
@@ -171,10 +151,6 @@ public class SqliteStore : ILocationSearch
             {
                 Id = reader.GetInt64("id"),
                 Visible = reader.GetBoolean("visible"),
-                Version = reader.GetInt32("version"),
-                ChangeSet = reader.GetInt64("change_set"),
-                Timestamp = DateTimeOffset.Parse(reader.GetString("timestamp")),
-                User = reader.GetString("user"),
                 Uid = reader.GetInt64("uid"),
                 Lat = reader.GetDouble("lat"),
                 Lon = reader.GetDouble("lon")
@@ -198,15 +174,11 @@ public class SqliteStore : ILocationSearch
             using var insertWayCommand = connection.CreateCommand();
             insertWayCommand.Transaction = transaction;
             insertWayCommand.CommandText = @"
-            INSERT INTO way (id, visible, version, change_set, timestamp, user, uid, closed_loop, tags)
-                VALUES($id, $visible, $version, $change_set, $timestamp, $user, $uid, $closed_loop, $tags);
+            INSERT INTO way (id, visible, uid, closed_loop, tags)
+                VALUES($id, $visible, $uid, $closed_loop, $tags);
             ";
             var idParam = insertWayCommand.Parameters.Add("$id", SqliteType.Integer);
             var visibleParam = insertWayCommand.Parameters.Add("$visible", SqliteType.Integer);
-            var versionParam = insertWayCommand.Parameters.Add("$version", SqliteType.Integer);
-            var changeSetParam = insertWayCommand.Parameters.Add("$change_set", SqliteType.Integer);
-            var timestampParam = insertWayCommand.Parameters.Add("$timestamp", SqliteType.Text);
-            var userParam = insertWayCommand.Parameters.Add("$user", SqliteType.Text);
             var uidParam = insertWayCommand.Parameters.Add("$uid", SqliteType.Integer);
             var closedLoopParam = insertWayCommand.Parameters.Add("$closed_loop", SqliteType.Integer);
             var tagsParam = insertWayCommand.Parameters.Add("$tags", SqliteType.Text);
@@ -238,10 +210,6 @@ public class SqliteStore : ILocationSearch
 
                 idParam.Value = way.Id;
                 visibleParam.Value = way.Visible as object ?? DBNull.Value;
-                versionParam.Value = way.Version as object ?? DBNull.Value;
-                changeSetParam.Value = way.ChangeSet as object ?? DBNull.Value;
-                timestampParam.Value = way.Timestamp?.ToString("yyyy-MM-ddTHH:mm:ssZ") as object ?? DBNull.Value;
-                userParam.Value = way.User as object ?? DBNull.Value;
                 uidParam.Value = way.Uid as object ?? DBNull.Value;
                 closedLoopParam.Value = closedLoop;
                 tagsParam.Value = DictUtils.DictToString(way.Tags);
@@ -266,7 +234,7 @@ public class SqliteStore : ILocationSearch
         connection.Open();
 
         using var command = connection.CreateCommand();
-        command.CommandText = @"SELECT id, visible, version, change_set, timestamp, user, uid, area_parent_id, closed_loop, tags FROM way";
+        command.CommandText = @"SELECT id, visible, uid, area_parent_id, closed_loop, tags FROM way";
         var whereClauses = new List<string>();
         if (ids != null)
         {
@@ -292,10 +260,6 @@ public class SqliteStore : ILocationSearch
             {
                 Id = reader.GetInt64("id"),
                 Visible = reader.GetBoolean("visible"),
-                Version = reader.GetInt32("version"),
-                ChangeSet = reader.GetInt64("change_set"),
-                Timestamp = DateTimeOffset.Parse(reader.GetString("timestamp")),
-                User = reader.GetString("user"),
                 Uid = reader.GetInt64("uid"),
                 AreaParentId = reader.GetValue("area_parent_id") as long?,
                 ClosedLoop = reader.GetBoolean("closed_loop"),
@@ -390,17 +354,13 @@ public class SqliteStore : ILocationSearch
         using var insertAreaCommand = connection.CreateCommand();
         insertAreaCommand.Transaction = transaction;
         insertAreaCommand.CommandText = @"
-                    INSERT INTO area (source, visible, version, change_set, timestamp, user, uid, outer_coords, inner_coords, names, suggested_colour, tile_id, layer, height, min_height, roof_type, roof_height, roof_colour, roof_orientation, is_large, is_3d)
-                        VALUES($source, $visible, $version, $change_set, $timestamp, $user, $uid, $outer_coords, $inner_coords, $names, $suggested_colour, $tile_id, $layer, $height, $min_height, $roof_type, $roof_height, $roof_colour, $roof_orientation, $is_large, $is_3d);
+                    INSERT INTO area (source, visible, uid, outer_coords, inner_coords, names, suggested_colour, tile_id, layer, height, min_height, roof_type, roof_height, roof_colour, roof_orientation, is_large, is_3d)
+                        VALUES($source, $visible, $uid, $outer_coords, $inner_coords, $names, $suggested_colour, $tile_id, $layer, $height, $min_height, $roof_type, $roof_height, $roof_colour, $roof_orientation, $is_large, $is_3d);
                     ";
 
         var sourceParam = insertAreaCommand.Parameters.Add("$source", SqliteType.Text);
         var visibleParam = insertAreaCommand.Parameters.Add("$visible", SqliteType.Integer);
-        var versionParam = insertAreaCommand.Parameters.Add("$version", SqliteType.Integer);
-        var changeSetParam = insertAreaCommand.Parameters.Add("$change_set", SqliteType.Integer);
-        var timestampParam = insertAreaCommand.Parameters.Add("$timestamp", SqliteType.Text);
-        var userParam = insertAreaCommand.Parameters.Add("$user", SqliteType.Text);
-        var uidParam = insertAreaCommand.Parameters.Add("$uid", SqliteType.Integer);
+       var uidParam = insertAreaCommand.Parameters.Add("$uid", SqliteType.Integer);
         var outerCoordsParam = insertAreaCommand.Parameters.Add("$outer_coords", SqliteType.Text);
         var innerCoordsParam = insertAreaCommand.Parameters.Add("$inner_coords", SqliteType.Text);
         var namesParam = insertAreaCommand.Parameters.Add("$names", SqliteType.Text);
@@ -422,10 +382,6 @@ public class SqliteStore : ILocationSearch
             var innerCoords = area.InnerCoordinates.AsString();
             sourceParam.Value = area.Source;
             visibleParam.Value = area.Visible as object ?? DBNull.Value;
-            versionParam.Value = area.Version as object ?? DBNull.Value;
-            changeSetParam.Value = area.ChangeSet as object ?? DBNull.Value;
-            timestampParam.Value = area.Timestamp?.ToString("yyyy-MM-ddTHH:mm:ssZ") as object ?? DBNull.Value;
-            userParam.Value = area.User as object ?? DBNull.Value;
             uidParam.Value = area.Uid as object ?? DBNull.Value;
             outerCoordsParam.Value = outerCoords;
             innerCoordsParam.Value = innerCoords;
@@ -453,7 +409,7 @@ public class SqliteStore : ILocationSearch
         connection.Open();
 
         using var command = connection.CreateCommand();
-        command.CommandText = @"SELECT id, source, visible, version, change_set, timestamp, user, uid, outer_coords, inner_coords, names, suggested_colour, tile_id, layer, height, min_height, roof_type, roof_height, roof_colour, roof_orientation, is_large, is_3d FROM area";
+        command.CommandText = @"SELECT id, source, visible, uid, outer_coords, inner_coords, names, suggested_colour, tile_id, layer, height, min_height, roof_type, roof_height, roof_colour, roof_orientation, is_large, is_3d FROM area";
 
         var whereClauses = new List<string>();
 
@@ -482,10 +438,6 @@ public class SqliteStore : ILocationSearch
                 Id = reader.GetInt64("id"),
                 Source = reader.GetString("source"),
                 Visible = reader.GetBoolean("visible"),
-                Version = reader.GetInt32("version"),
-                ChangeSet = reader.GetInt64("change_set"),
-                Timestamp = DateTimeOffset.Parse(reader.GetString("timestamp")),
-                User = reader.GetString("user"),
                 Uid = reader.GetInt64("uid"),
                 OuterCoordinates = reader.GetString("outer_coords").CoordsFromString(),
                 InnerCoordinates = reader.GetString("inner_coords").CoordsFromString(),

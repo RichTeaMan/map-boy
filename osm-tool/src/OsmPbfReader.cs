@@ -20,10 +20,6 @@ public class OsmPbfReader : IReader
             {
                 Id = osmGeo.Id!.Value,
                 Visible = osmGeo.Visible,
-                Version = osmGeo.Version,
-                ChangeSet = osmGeo.ChangeSetId,
-                Timestamp = osmGeo.TimeStamp,
-                User = osmGeo.UserName,
                 Uid = osmGeo.UserId,
                 Lat = osmNode.Latitude!.Value,
                 Lon = osmNode.Longitude!.Value,
@@ -44,10 +40,6 @@ public class OsmPbfReader : IReader
             {
                 Id = osmGeo.Id!.Value,
                 Visible = osmGeo.Visible,
-                Version = osmGeo.Version,
-                ChangeSet = osmGeo.ChangeSetId,
-                Timestamp = osmGeo.TimeStamp,
-                User = osmGeo.UserName,
                 Uid = osmGeo.UserId,
                 NodeReferences = osmWay.Nodes.AsReadOnly(),
                 Tags = osmWay.Tags.ToDictionary(t => t.Key, t => t.Value)
@@ -67,10 +59,6 @@ public class OsmPbfReader : IReader
             {
                 Id = osmGeo.Id!.Value,
                 Visible = osmGeo.Visible,
-                Version = osmGeo.Version,
-                ChangeSet = osmGeo.ChangeSetId,
-                Timestamp = osmGeo.TimeStamp,
-                User = osmGeo.UserName,
                 Uid = osmGeo.UserId,
                 Members = osmRelation.Members.Select(m => new OsmRelationMember
                 {

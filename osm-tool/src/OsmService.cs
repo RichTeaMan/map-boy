@@ -270,10 +270,6 @@ public class OsmService
                 {
                     Source = $"relation-{relation.Id}",
                     Visible = visible,
-                    Version = relation.Version,
-                    ChangeSet = relation.ChangeSet,
-                    Timestamp = relation.Timestamp,
-                    User = relation.User,
                     Uid = relation.Uid,
                     OuterCoordinates = coords,
                     InnerCoordinates = innerCoords,
@@ -429,10 +425,6 @@ public class OsmService
                 {
                     Source = $"way-{way.Id}",
                     Visible = visible,
-                    Version = way.Version,
-                    ChangeSet = way.ChangeSet,
-                    Timestamp = way.Timestamp,
-                    User = way.User,
                     Uid = way.Uid,
                     OuterCoordinates = new[] { orderedCoords.ToArray() },
                     InnerCoordinates = Array.Empty<Coord[]>(),
@@ -552,10 +544,6 @@ public class OsmService
                 {
                     Source = $"way-{way.Id}",
                     Visible = way.Visible ?? true,
-                    Version = way.Version,
-                    ChangeSet = way.ChangeSet,
-                    Timestamp = way.Timestamp,
-                    User = way.User,
                     Uid = way.Uid,
                     OuterCoordinates = new[] { highwayCoords.ToArray() },
                     InnerCoordinates = Array.Empty<Coord[]>(),

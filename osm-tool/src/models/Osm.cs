@@ -7,10 +7,6 @@ public class OsmBase
     public long Id { get; init; }
 
     public bool? Visible { get; init; }
-    public int? Version { get; init; }
-    public long? ChangeSet { get; init; }
-    public DateTimeOffset? Timestamp { get; init; }
-    public string? User { get; init; }
     public long? Uid { get; init; }
     public Dictionary<string, string> Tags { get; init; } = new Dictionary<string, string>();
 

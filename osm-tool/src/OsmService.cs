@@ -40,7 +40,7 @@ public class OsmService
         await SaveAreas(reader);
 
         Console.WriteLine("Building search index...");
-        BuildSearchIndex();
+        await BuildSearchIndex();
 
         Console.WriteLine("Deduplicating 3D and 2D buildings...");
         await Deduplicate3dBuildings();
@@ -64,12 +64,11 @@ public class OsmService
             .ToArray();
     }
 
-    private void BuildSearchIndex()
+    private async Task BuildSearchIndex()
     {
         locationSearch.InitIndex();
         var searchIndexEntries = sqliteStore.FetchAreas()
             .Where(a => a.Names.Length > 0 && a?.OuterCoordinates?.FirstOrDefault()?.FirstOrDefault() != null)
-            .ToEnumerable()
             .SelectMany(area =>
             {
                 return area.Names.Select(name =>
@@ -78,7 +77,7 @@ public class OsmService
                     return new SearchIndexEntry { Name = name, Lat = coord.Lat, Lon = coord.Lon };
                 });
             });
-        locationSearch.UpdateIndex(searchIndexEntries);
+        locationSearch.UpdateIndex(await searchIndexEntries.ToArrayAsync());
     }
 
     public async Task SaveNodes(IReader reader)
@@ -99,10 +98,10 @@ public class OsmService
         await SaveRelationAreas(reader.IterateRelations().Where(r => r.Tags.Any(t => t.Key == "type" && t.Value == "multipolygon")));
 
         Console.WriteLine("Writing single polygon areas.");
-        await SaveAreaBatch(sqliteStore.FetchWays().Where(w => w.AreaParentId == null && w.ClosedLoop).ToEnumerable());
+        await SaveAreaBatch(await sqliteStore.FetchWays().Where(w => w.AreaParentId == null && w.ClosedLoop).ToArrayAsync());
 
         Console.WriteLine("Writing highways.");
-        await SaveHighwayAreaBatch(sqliteStore.FetchWays().Where(w => !w.ClosedLoop).ToEnumerable());
+        await SaveHighwayAreaBatch(await sqliteStore.FetchWays().Where(w => !w.ClosedLoop).ToArrayAsync());
     }
 
     private async Task SaveRelationAreas(IEnumerable<OsmRelation> relations)

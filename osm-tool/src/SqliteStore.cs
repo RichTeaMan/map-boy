@@ -50,7 +50,7 @@ public class SqliteStore : ILocationSearch
 
         CREATE TABLE IF NOT EXISTS way (
             id INTEGER PRIMARY KEY,
-            user TEXT NOT NULL,
+            visible INTEGER NULL,
             uid INTEGER NULL,
             closed_loop INTEGER NOT NULL,
             area_parent_id INTEGER NULL,
@@ -93,6 +93,16 @@ public class SqliteStore : ILocationSearch
         );
         CREATE INDEX idx_tile_area_map_area_id ON tile_area_map (area_id);
         CREATE INDEX idx_tile_area_map_tile_id ON tile_area_map (tile_id);
+
+        CREATE TABLE IF NOT EXISTS furniture (
+            id INTEGER PRIMARY KEY,
+            uid INTEGER NOT NULL,
+            furniture_type INTEGER NOT NULL,
+            lat REAL NOT NULL,
+            lon REAL NOT NULL,
+            tile_id INTEGER NOT NULL
+        );
+        CREATE INDEX idx_furniture_tile_id ON furniture (tile_id);
         ";
 
         await createTableCommand.ExecuteNonQueryAsync();
@@ -128,6 +138,37 @@ public class SqliteStore : ILocationSearch
                 tileIdParam.Value = tileService.CalcTileId(node.Lat, node.Lon);
                 layerParam.Value = node.Tags.TryGetValue("layer", out string? value) ? value : 0;
                 await insertNodeCommand.ExecuteNonQueryAsync();
+            }
+            await transaction.CommitAsync();
+        }
+    }
+
+    public async Task SaveFurnitureBatch(IEnumerable<Furniture> furnitures)
+    {
+        foreach (var furnitureBatch in furnitures.Chunk(1000))
+        {
+            using var connection = createConnection();
+            using var transaction = connection.BeginTransaction();
+            using var insertFurnitureCommand = connection.CreateCommand();
+            insertFurnitureCommand.Transaction = transaction;
+            insertFurnitureCommand.CommandText = @"
+            INSERT INTO furniture (uid, lat, lon, tile_id, furniture_type)
+                VALUES($uid, $lat, $lon, $tile_id, $furniture_type);
+            ";
+
+            var uidParam = insertFurnitureCommand.Parameters.Add("$uid", SqliteType.Integer);
+            var latParam = insertFurnitureCommand.Parameters.Add("$lat", SqliteType.Real);
+            var lonParam = insertFurnitureCommand.Parameters.Add("$lon", SqliteType.Real);
+            var tileIdParam = insertFurnitureCommand.Parameters.Add("$tile_id", SqliteType.Integer);
+            var furnitureTypeParam = insertFurnitureCommand.Parameters.Add("$furniture_type", SqliteType.Text);
+            foreach (var node in furnitureBatch)
+            {
+                uidParam.Value = node.Uid;
+                latParam.Value = node.Lat;
+                lonParam.Value = node.Lon;
+                tileIdParam.Value = node.TileId;
+                furnitureTypeParam.Value = node.FurnitureType;
+                await insertFurnitureCommand.ExecuteNonQueryAsync();
             }
             await transaction.CommitAsync();
         }
@@ -402,7 +443,6 @@ public class SqliteStore : ILocationSearch
         }
         await transaction.CommitAsync();
     }
-
     public async IAsyncEnumerable<Area> FetchAreas(long[]? ids = null, long[]? tileIds = null)
     {
         using var connection = createConnection();

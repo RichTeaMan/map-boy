@@ -131,4 +131,16 @@ public static class DictUtils
         value = default;
         return false;
     }
+
+    public static bool KeyValueIs<K, V>(this Dictionary<K, V> dict, K key, V value) where K : notnull
+    {
+        if (dict.TryGetValueFromKeys([key], out V? actualValue))
+        {
+            if (value != null)
+            {
+                return value.Equals(actualValue);
+            }
+        }
+        return false;
+    }
 }

@@ -1,6 +1,7 @@
 //using System.Collections.Concurrent;
 using System.Collections.Concurrent;
 using System.Data;
+using Lucene.Net.Index;
 using MapBoy.Models;
 using OsmTool.Models;
 
@@ -82,8 +83,11 @@ public class OsmService
 
     public async Task SaveNodes(IReader reader)
     {
-        var nodes = reader.IterateNodes();
-        await sqliteStore.SaveNodeBatch(nodes);
+        foreach (var nodes in reader.IterateNodes().Chunk(10_000))
+        {
+            await sqliteStore.SaveNodeBatch(nodes);
+            await SaveFurniture(nodes);
+        }
     }
 
     public async Task SaveWays(IReader reader)
@@ -566,6 +570,32 @@ public class OsmService
 
             await sqliteStore.SaveAreaBatch(databaseAreas);
         }
+    }
+
+    async private Task SaveFurniture(IEnumerable<OsmNode> nodes)
+    {
+        var furnitureList = new List<Furniture>();
+        foreach (OsmNode node in nodes)
+        {
+            // traffic light
+            if (node.Tags.KeyValueIs("highway", "traffic_signals"))
+            {
+                furnitureList.Add(FromOsmNode(FurnitureType.TrafficLight, node));
+            }
+        }
+        await sqliteStore.SaveFurnitureBatch(furnitureList);
+    }
+
+    private Furniture FromOsmNode(FurnitureType furnitureType, OsmNode node)
+    {
+        return new Furniture
+        {
+            Uid = node.Id,
+            TileId = tileService.CalcTileId(node.Lat, node.Lon),
+            Lat = node.Lat,
+            Lon = node.Lon,
+            FurnitureType = furnitureType,
+        };
     }
 
 

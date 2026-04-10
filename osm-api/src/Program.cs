@@ -4,6 +4,8 @@ using OsmTool;
 
 public class Program
 {
+    const string STATIC_FILES_DIR = "static-files";
+
     private static string FetchDatabasePath()
     {
         var dbFilePath = Environment.GetEnvironmentVariable("DB_FILE_PATH") ?? "osm.db";
@@ -53,14 +55,21 @@ public class Program
             app.MapOpenApi();
         }
 
-        app.UseFileServer(new FileServerOptions
+        if (Directory.Exists(STATIC_FILES_DIR))
         {
-            FileProvider = new PhysicalFileProvider(Path.Combine(builder.Environment.ContentRootPath, "static-files")),
-            RequestPath = "",
-            DefaultFilesOptions = { DefaultFileNames = ["index.html"] },
-            EnableDefaultFiles = true,
-            StaticFileOptions = { ServeUnknownFileTypes = true }
-        });
+            app.UseFileServer(new FileServerOptions
+            {
+                FileProvider = new PhysicalFileProvider(Path.Combine(builder.Environment.ContentRootPath, "static-files")),
+                RequestPath = "",
+                DefaultFilesOptions = { DefaultFileNames = ["index.html"] },
+                EnableDefaultFiles = true,
+                StaticFileOptions = { ServeUnknownFileTypes = true }
+            });
+        }
+        else
+        {
+            app.Logger.LogWarning($"Directory '{STATIC_FILES_DIR}' not found, not serving static files.");
+        }
 
         if (Environment.GetEnvironmentVariable("ALLOW_HTTP")?.ToLower() != "true")
         {
@@ -72,7 +81,7 @@ public class Program
             await next(context);
             var endTime = DateTimeOffset.Now;
             var duration = endTime - startTime;
-            Console.WriteLine($"[{DateTimeOffset.Now}] {context.Request.Path} - {context.Response.StatusCode} {duration.TotalMilliseconds:0.##}ms");
+            app.Logger.LogInformation($"[{DateTimeOffset.Now}] {context.Request.Path} - {context.Response.StatusCode} {duration.TotalMilliseconds:0.##}ms");
         });
 
         var apiPath = app.MapGroup("/api");
@@ -123,6 +132,24 @@ public class Program
             await httpContext.Response.WriteAsJsonAsync(areas);
         })
         .WithName("GetAreaByIds");
+
+        apiPath.MapGet("/furnitureByTileIds", async (httpContext) =>
+        {
+            var store = CreateSqliteStore();
+            long[]? tileIds = null;
+            if (httpContext.Request.Query.TryGetValue("tileIds", out var tileIdsStr))
+            {
+                tileIds = tileIdsStr.Select(id => long.Parse(tileIdsStr.ToString())).ToArray();
+            }
+            if (tileIds == null)
+            {
+                httpContext.Response.StatusCode = 400;
+                return;
+            }
+            var furniture = await store.FetchFurnitureByTileIds(tileIds).ToArrayAsync();
+            await httpContext.Response.WriteAsJsonAsync(furniture);
+        })
+        .WithName("GetFurnitureByTileIds");
 
         apiPath.MapGet("/tileId/{lat:double}/{lon:double}", (double lat, double lon) =>
         {

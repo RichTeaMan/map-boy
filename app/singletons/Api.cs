@@ -17,6 +17,8 @@ public partial class Api : GodotObject
 
     private readonly Queue<Area[]> areasQueue = new Queue<Area[]>();
 
+    private readonly Queue<Furniture[]> furnitureQueue = new Queue<Furniture[]>();
+
     private readonly Http.HttpClient httpClient = new Http.HttpClient();
 
     private T DequeueOrNull<T>(Queue<T> queue) where T : class
@@ -96,6 +98,20 @@ public partial class Api : GodotObject
     public AreaContainer DequeueGetAreaByTileId()
     {
         return DequeueOrNull(areaContainerQueue);
+    }
+
+    public void QueueGetFurnitureByTileId(long tileId)
+    {
+        void cb(Furniture[] furniture)
+        {
+            furnitureQueue.Enqueue(furniture);
+        }
+        queueRequest($"{getBase()}/furnitureByTileIds?tileIds={tileId}", (Action<Furniture[]>)cb);
+    }
+
+    public Furniture[] DequeueGetFurnitureByTileId()
+    {
+        return DequeueOrNull(furnitureQueue);
     }
 
     public Variant DequeueGetAreaByTileIdAsVariant()

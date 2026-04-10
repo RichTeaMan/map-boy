@@ -49,3 +49,7 @@ docker run -it --rm --name osm-api -p 5291:8080 -e ALLOW_HTTP=true ghcr.io/richt
 ## Running the client
 
 Open the custom Godot build from `godot-build/bin` and run the godot project in `app`.
+
+## Attributions
+
+Uses assets from [Kaykit](https://kaylousberg.com/game-assets).

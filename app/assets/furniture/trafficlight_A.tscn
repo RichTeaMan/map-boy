@@ -1,0 +1,8 @@
+[gd_scene format=3 uid="uid://bxw4na253yo6t"]
+
+[ext_resource type="PackedScene" uid="uid://unomtvpyxhld" path="res://assets/furniture/trafficlight_A.gltf" id="1_id6wo"]
+
+[node name="TrafficlightA" type="Node3D" unique_id=1234466167]
+
+[node name="trafficlight_A2" parent="." unique_id=555545244 instance=ExtResource("1_id6wo")]
+transform = Transform3D(10, 0, 0, 0, 10, 0, 0, 0, 10, 0, 0, 0)

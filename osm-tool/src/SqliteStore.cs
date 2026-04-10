@@ -401,7 +401,7 @@ public class SqliteStore : ILocationSearch
 
         var sourceParam = insertAreaCommand.Parameters.Add("$source", SqliteType.Text);
         var visibleParam = insertAreaCommand.Parameters.Add("$visible", SqliteType.Integer);
-       var uidParam = insertAreaCommand.Parameters.Add("$uid", SqliteType.Integer);
+        var uidParam = insertAreaCommand.Parameters.Add("$uid", SqliteType.Integer);
         var outerCoordsParam = insertAreaCommand.Parameters.Add("$outer_coords", SqliteType.Text);
         var innerCoordsParam = insertAreaCommand.Parameters.Add("$inner_coords", SqliteType.Text);
         var namesParam = insertAreaCommand.Parameters.Add("$names", SqliteType.Text);
@@ -510,6 +510,30 @@ public class SqliteStore : ILocationSearch
         {
             var areaId = reader.GetInt64(0);
             yield return areaId;
+        }
+    }
+
+    public async IAsyncEnumerable<Furniture> FetchFurnitureByTileIds(long[] tileIds)
+    {
+
+        using var connection = createConnection();
+        connection.Open();
+
+        using var command = connection.CreateCommand();
+        command.CommandText = @"SELECT id, uid, furniture_type, lat, lon, tile_id FROM furniture WHERE tile_id IN ($tile_ids);".Replace("$tile_ids", string.Join(",", tileIds));
+
+        using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            yield return new Furniture
+            {
+                Id = reader.GetInt64("id"),
+                Uid = reader.GetInt64("uid"),
+                FurnitureType = (FurnitureType)reader.GetInt32("furniture_type"),
+                Lat = reader.GetDouble("lat"),
+                Lon = reader.GetDouble("lon"),
+                TileId = reader.GetInt64("tile_id"),
+            };
         }
     }
 

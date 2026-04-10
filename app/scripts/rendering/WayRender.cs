@@ -27,8 +27,8 @@ public partial class WayRender : GodotObject
         { "turf-green", Colors.MediumSeaGreen },
         { "light-purple", Colors.Plum },
         { "light-red", Colors.LightPink },
-        { "dark-grey", Colors.SlateGray },
-        { "darkgrey", Colors.SlateGray },
+        { "dark-grey", Colors.DarkGray },
+        { "darkgrey", Colors.DarkGray },
         { "pale-yellow", Colors.Honeydew },
     };
 

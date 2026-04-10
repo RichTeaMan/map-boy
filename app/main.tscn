@@ -20,6 +20,8 @@ script = ExtResource("1_0xm2m")
 
 [node name="map" type="Node3D" parent="." unique_id=945060883]
 
+[node name="furniture" type="Node3D" parent="." unique_id=1535399822]
+
 [node name="tile_markers" type="Node3D" parent="." unique_id=369366876]
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=211826195]

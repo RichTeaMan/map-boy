@@ -36,9 +36,13 @@ public partial class Main : Node3D
 
     private Node3D Map => GetNode<Node3D>("map");
 
+    private Node3D Furniture => GetNode<Node3D>("furniture");
+
     private Api api = new Api();
 
     private WayRender wayRender = new WayRender();
+
+    private FurnitureFactory furnitureFactory = new FurnitureFactory();
 
     public override void _Ready()
     {
@@ -124,6 +128,16 @@ public partial class Main : Node3D
                 break;
             }
             OnTilesHttpRequestCompleted(response);
+        }
+
+        while (true)
+        {
+            var response = api.DequeueGetFurnitureByTileId();
+            if (response == null)
+            {
+                break;
+            }
+            OnFurnitureHttpRequestCompleted(response);
         }
 
         // purge map
@@ -217,7 +231,7 @@ public partial class Main : Node3D
         var lat2 = current_lat + degRange;
         var lon2 = current_lon + degRange;
 
-        var mapAreaNodes = Map.GetChildren().Cast<MapAreaNode>().ToArray();
+        var mapAreaNodes = Map.GetChildren().Select(c => c as MapAreaNode).Where(c => c != null).ToArray();
         var purgeLimit = Mathf.Min(mapAreaNodes.Count(), lastPurgeIndex + purgeAmount);
         var i = lastPurgeIndex;
         while (i < purgeLimit)
@@ -283,7 +297,6 @@ public partial class Main : Node3D
         }
     }
 
-
     private void OnTilesHttpRequestCompleted(TileContainer tileResponse)
     {
         areaQueue.Clear();
@@ -294,9 +307,26 @@ public partial class Main : Node3D
                 continue;
             }
             areaQueue.Enqueue(tile.Id);
+            api.QueueGetFurnitureByTileId(tile.Id);
         }
         //print("tile response processed")
         tilesPending = false;
+    }
+
+    private void OnFurnitureHttpRequestCompleted(Furniture[] furnitures)
+    {
+        foreach (var furniture in furnitures)
+        {
+            if (!loadedTiles.Contains(furniture.TileId))
+            {
+                continue;
+            }
+            var furnitureNode = furnitureFactory.CreateFurniture(furniture, global);
+            if (furnitureNode != null)
+            {
+                Furniture.AddChild(furnitureNode);
+            }
+        }
     }
 
     private void OnTeleport(double lat, double lon)

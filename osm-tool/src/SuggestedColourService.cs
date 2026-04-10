@@ -53,9 +53,7 @@ public class SuggestedColourService
                 case "service":
                 case "residential":
                 case "corridor":
-                    return "white";
                 case "primary":
-                    return "yellow";
                 case "motorway":
                 case "trunk":
                 case "motorway_link":
@@ -63,7 +61,6 @@ public class SuggestedColourService
                 case "primary_link":
                 case "secondary_link":
                 case "tertiary_link":
-                    return "red";
                 case "living_street":
                 case "bus_guideway":
                 case "raceway":
@@ -76,13 +73,12 @@ public class SuggestedColourService
                 case "stop":
                 case "turning_circle":
                 case "turning_loop":
-                    return "red";
                 case "pedestrian":
                 case "footway":
                 case "path":
                 case "sidewalk":
                 case "cycleway":
-                    return "light-grey";
+                    return "dark-grey";
                 case "traffic_island":
                 case "steps":
                     return NO_COLOUR;

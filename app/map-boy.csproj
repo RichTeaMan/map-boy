@@ -1,4 +1,4 @@
-<Project Sdk="Godot.NET.Sdk/4.6.0-mapboy">
+<Project Sdk="Godot.NET.Sdk/4.6.2-mapboy">
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <EnableDynamicLoading>true</EnableDynamicLoading>
@@ -8,23 +8,4 @@
   <ItemGroup>
     <ProjectReference Include="..\models\models.csproj" />
   </ItemGroup>
-
-  <!-- 
-    <PropertyGroup>
-      <GodotDisableImplicitSharedLibAdditions>true</GodotDisableImplicitSharedLibAdditions>
-      <GodotRegisterEditorAssemblies>false</GodotRegisterEditorAssemblies>
-    </PropertyGroup>
-    <ItemGroup>
-      <Reference Include="GodotSharp">
-        <HintPath>../godot-build/bin/linuxbsd-editor/GodotSharp/Api/Release/GodotSharp.dll</HintPath>
-        <SpecificVersion>true</SpecificVersion>
-        <Private>true</Private>
-      </Reference>
-      <Reference Include="GodotSharpEditor" Condition=" '$(Configuration)' == 'Debug' ">
-        <HintPath>../godot-build/bin/linuxbsd-editor/GodotSharp/Api/Release/GodotSharpEditor.dll</HintPath>
-        <SpecificVersion>true</SpecificVersion>
-        <Private>true</Private>
-      </Reference>
-    </ItemGroup>
-    -->
 </Project>

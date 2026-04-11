@@ -9,7 +9,7 @@ if [[ $PLATFORM == "" ]]; then
   PLATFORM="all"
 fi
 
-export GODOT_TAG="4.6-stable"
+export GODOT_TAG="4.6.2-stable"
 export GODOT_VERSION_STATUS="mapboy"
 
 git -c "advice.detachedhead=false" clone --branch "$GODOT_TAG" --depth 1 https://github.com/godotengine/godot.git
@@ -42,7 +42,6 @@ if [[ $PLATFORM == "linux" || $PLATFORM == "all" ]]; then
 
     # release template
 
-    mkdir -p ../bin/linuxbsd-template-release
     scons platform=linuxbsd float=64 precision=double production=yes target=template_release arch=x86_64
     
     cp -r bin/godot.linuxbsd.editor.double.x86_64.mono ../bin/linux/.

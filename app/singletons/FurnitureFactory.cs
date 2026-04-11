@@ -18,8 +18,16 @@ public class FurnitureFactory
     {
         switch (furnitureType)
         {
+            case FurnitureType.Bench:
+                return ResourceLoader.Load<PackedScene>("res://assets/furniture/bench.tscn");
+            case FurnitureType.Bin:
+                return null; // TODO, bin asset
+            case FurnitureType.StreetLamp:
+                return ResourceLoader.Load<PackedScene>("res://assets/furniture/streetlamp.tscn");
             case FurnitureType.TrafficLight:
                 return ResourceLoader.Load<PackedScene>("res://assets/furniture/trafficlight_A.tscn");
+            case FurnitureType.Tree:
+                return ResourceLoader.Load<PackedScene>("res://assets/furniture/tree_A.tscn");
             default:
                 throw new Exception($"Unknown furniture type {furnitureType}");
         }

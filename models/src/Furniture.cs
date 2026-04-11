@@ -5,7 +5,8 @@ public enum FurnitureType
     TrafficLight,
     StreetLamp,
     Bench,
-    Bin
+    Bin,
+    Tree
 }
 
 public class Furniture

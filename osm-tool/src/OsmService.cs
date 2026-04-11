@@ -582,6 +582,30 @@ public class OsmService
             {
                 furnitureList.Add(FromOsmNode(FurnitureType.TrafficLight, node));
             }
+            // tree
+            else if (node.Tags.KeyValueIs("natural", "tree"))
+            {
+                furnitureList.Add(FromOsmNode(FurnitureType.Tree, node));
+            }
+            // bench
+            else if (node.Tags.KeyValueIs("amenity", "bench"))
+            {
+                // consider using backrest=true and material=wood.
+                // see https://www.openstreetmap.org/node/6245715248
+                furnitureList.Add(FromOsmNode(FurnitureType.Bench, node));
+            }
+            // bin
+            else if (node.Tags.KeyValueIs("amenity", "waste_basket"))
+            {
+                // consider using backrest=true and material=wood.
+                // see https://www.openstreetmap.org/node/6245715248
+                furnitureList.Add(FromOsmNode(FurnitureType.Bench, node));
+            }
+            // streetlamp - doesn't seem to show on OSM map?
+            else if (node.Tags.KeyValueIs("highway", "street_lamp"))
+            {
+                furnitureList.Add(FromOsmNode(FurnitureType.StreetLamp, node));
+            }
         }
         await sqliteStore.SaveFurnitureBatch(furnitureList);
     }

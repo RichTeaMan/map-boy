@@ -1,0 +1,8 @@
+[gd_scene format=3 uid="uid://d0xsxhauscarj"]
+
+[ext_resource type="PackedScene" uid="uid://bsfiux8n87ncn" path="res://assets/furniture/Tree_1_A_Color1.gltf" id="1_vhguw"]
+
+[node name="TreeA" type="Node3D" unique_id=1916030106]
+
+[node name="Tree_1_A_Color12" parent="." unique_id=1086670600 instance=ExtResource("1_vhguw")]
+transform = Transform3D(5, 0, 0, 0, 5, 0, 0, 0, 5, 0, 0, 0)

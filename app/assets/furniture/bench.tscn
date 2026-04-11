@@ -1,0 +1,8 @@
+[gd_scene format=3 uid="uid://d22tq80sk03ov"]
+
+[ext_resource type="PackedScene" uid="uid://cew2pt1i66jtu" path="res://assets/furniture/bench.gltf" id="1_vovs1"]
+
+[node name="Bench" type="Node3D" unique_id=891738200]
+
+[node name="bench2" parent="." unique_id=454651422 instance=ExtResource("1_vovs1")]
+transform = Transform3D(10, 0, 0, 0, 10, 0, 0, 0, 10, 0, 0, 0)

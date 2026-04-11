@@ -1,0 +1,8 @@
+[gd_scene format=3 uid="uid://dmca1kvo43cip"]
+
+[ext_resource type="PackedScene" uid="uid://0bv40133j1y3" path="res://assets/furniture/streetlight.gltf" id="1_sc8g2"]
+
+[node name="Streetlamp" type="Node3D" unique_id=292888581]
+
+[node name="streetlight2" parent="." unique_id=1904898985 instance=ExtResource("1_sc8g2")]
+transform = Transform3D(10, 0, 0, 0, 10, 0, 0, 0, 10, 0, 0, 0)

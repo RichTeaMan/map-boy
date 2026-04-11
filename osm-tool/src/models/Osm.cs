@@ -28,7 +28,7 @@ public class OsmNode : OsmBase
 
 public class OsmWay : OsmBase
 {
-    public required ReadOnlyCollection<long> NodeReferences { get; init; }
+    public required List<long> NodeReferences { get; init; }
 
     public bool ClosedLoop { get; init; }
 }
@@ -42,5 +42,5 @@ public class OsmRelationMember
 
 public class OsmRelation : OsmBase
 {
-    public required ReadOnlyCollection<OsmRelationMember> Members { get; init; }
+    public required List<OsmRelationMember> Members { get; init; }
 }

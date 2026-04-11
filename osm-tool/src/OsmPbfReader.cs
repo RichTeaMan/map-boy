@@ -41,7 +41,7 @@ public class OsmPbfReader : IReader
                 Id = osmGeo.Id!.Value,
                 Visible = osmGeo.Visible,
                 Uid = osmGeo.UserId,
-                NodeReferences = osmWay.Nodes.AsReadOnly(),
+                NodeReferences = osmWay.Nodes.ToList(),
                 Tags = osmWay.Tags.ToDictionary(t => t.Key, t => t.Value)
             };
         }
@@ -65,7 +65,7 @@ public class OsmPbfReader : IReader
                     Id = m.Id,
                     Role = m.Role.ToLower(),
                     Type = m.Type.ToString().ToLower()
-                }).ToList().AsReadOnly(),
+                }).ToList(),
                 Tags = osmRelation.Tags.ToDictionary(t => t.Key, t => t.Value)
             };
         }

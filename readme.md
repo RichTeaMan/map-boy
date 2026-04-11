@@ -11,13 +11,13 @@ another dotnet projects hosts that data over a REST API, and finally a Godot pro
 
 ## Requirements
 
-Map boy requires [dotnet SDK 9.0](https://dotnet.microsoft.com/en-us/download/dotnet/9.0) and [Godot](https://godotengine.org/)
+Map boy requires [dotnet SDK 10.0](https://dotnet.microsoft.com/en-us/download/dotnet/9.0) and [Godot](https://godotengine.org/)
 (official build of Godot don't work with Map Boy, see below).
 
 ### Custom Godot build
 
 However, Map Boy needs Godot with double floating point precision, which doesn't have an official build. Instead, this project
-includes a docker image that builds Godot for Linux, Windows and web exports. A shell script wraps all the docker instuctions:
+includes a docker image that builds Godot for Linux. A shell script wraps all the docker instuctions:
 
 ```bash
 # only works on Linux with Docker installed. Windows builds will also be created

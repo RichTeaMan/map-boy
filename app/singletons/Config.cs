@@ -26,6 +26,11 @@ public class Config
         }
     }
 
+    /// <summary>
+    /// Gets or sets the degrees around the camera position that map data will be loaded for. 1 degree is around 17km.
+    /// </summary>
+    public double LoadWindow { get; set; } = 0.02;
+
     private static Config _config = null;
 
     public static Config Fetch()

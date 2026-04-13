@@ -1,0 +1,45 @@
+[gd_scene format=3 uid="uid://0sp8n8cdp2ox"]
+
+[ext_resource type="Script" uid="uid://wyly82nj7hth" path="res://ui/ConfigUi.cs" id="1_nax2w"]
+
+[node name="ConfigUi" type="Control" unique_id=2042048574]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_nax2w")
+
+[node name="GridContainer" type="GridContainer" parent="." unique_id=333129187]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+columns = 2
+
+[node name="table" type="Tree" parent="." unique_id=549937817]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+columns = 2
+column_titles_visible = true
+
+[node name="Label" type="Label" parent="table" unique_id=585764003]
+layout_mode = 0
+offset_right = 68.0
+offset_bottom = 23.0
+text = "Property"
+
+[node name="Label2" type="Label" parent="table" unique_id=108162230]
+layout_mode = 0
+offset_left = 72.0
+offset_right = 116.0
+offset_bottom = 23.0
+text = "Value"

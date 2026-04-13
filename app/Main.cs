@@ -26,8 +26,6 @@ public partial class Main : Node3D
     /// </summary>
     private int purgeAmount = 5;
 
-    double loadWindow = 0.02;
-
     private Global global;
 
     private Node3D TileMarkers => GetNode<Node3D>("tile_markers");
@@ -195,8 +193,8 @@ public partial class Main : Node3D
             return;
         }
 
-        // search for tiles 0.1 degrees around camera postion, which is very roughly similar to 1.7km
-        var degRange = loadWindow;
+        
+        var degRange = Config.Fetch().LoadWindow;
 
         var cameraCoord = global.VectorToLatLon(new Vector2(Cameras.Position.X, Cameras.Position.Z));
         var currentLat = cameraCoord.X;
@@ -221,7 +219,7 @@ public partial class Main : Node3D
     private void PurgeMapAreaNodes()
     {
         // search for tiles 0.1 degrees around camera postion, which is very roughly similar to 1.7km
-        var degRange = loadWindow * global.coordFactor * 2.0;
+        var degRange = Config.Fetch().LoadWindow * global.coordFactor * 2.0;
         var current_lat = Cameras.Position.X;
         var current_lon = Cameras.Position.Z;
 
